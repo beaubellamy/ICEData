@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -94,11 +95,13 @@ namespace ICEData
 
             
             // Read the data
-            readICEData(filename);
+            List<TrainDetails> TrainRecords = new List<TrainDetails>();
+            TrainRecords = readICEData(filename);
 
-            // Write data to file
+            // Write data to an excel file
+            writeTrainData(TrainRecords);
 
-
+            tool.messageBox("Program Complete.");
         }
 
         /// <summary>
@@ -175,7 +178,8 @@ namespace ICEData
                     double.TryParse(fields[11], out latitude);
                     double.TryParse(fields[13], out longitude);
                     double.TryParse(fields[5], out trainDirection);
-                    DateTime.TryParseExact(fields[14], "dd/MM/yyyy HH:mm", null, System.Globalization.DateTimeStyles.AssumeLocal, out NotificationDateTime);
+                    //DateTime.TryParseExact(fields[14], "dd/MM/yyyy HH:mm", null, System.Globalization.DateTimeStyles.AssumeLocal, out NotificationDateTime);
+                    DateTime.TryParse(fields[14], out NotificationDateTime);
 
                     // if record within range limits include in recordlist
                     TrainDetails record = new TrainDetails(TrainID, locoID, NotificationDateTime, latitude, longitude, speed, kmPost, trainDirection);
@@ -191,6 +195,118 @@ namespace ICEData
         }
 
 
+        /// <summary>
+        /// Write the train records to an excel file.
+        /// </summary>
+        /// <param name="trainRecords">The list of train details object containing all the train records.</param>
+        public static void writeTrainData(List<TrainDetails> trainRecords)
+        {
+            
+            /* Create the microsfot excel references. */
+            Microsoft.Office.Interop.Excel.Application excel;
+            Microsoft.Office.Interop.Excel._Workbook workbook;
+            Microsoft.Office.Interop.Excel._Worksheet worksheet;
 
+            /* Start Excel and get Application object. */
+            excel = new Microsoft.Office.Interop.Excel.Application();
+
+            /* Get the reference to the new workbook. */
+            workbook = (Microsoft.Office.Interop.Excel._Workbook)(excel.Workbooks.Add(""));
+
+            /* Create the header details. */
+            string[] headerString = { "Train ID", "loco ID", " Notification Date Time", "Latitude", "Longitude", "Speed", "km Post", "Train Direction" };
+
+            /* Pagenate the data for writing to excel. */
+            int excelPageSize = 1000000;        /* Page size of the excel worksheet. */
+            int excelPages = 1;                 /* Number of Excel pages to write. */
+            int headerOffset = 2;
+
+            /* Adjust the excel page size or the number of pages to write. */
+            if (trainRecords.Count() < excelPageSize)
+                excelPageSize = trainRecords.Count();
+            else
+                excelPages = (int)Math.Round((double)trainRecords.Count() / excelPageSize + 0.5);
+            
+
+            /* Deconstruct the train details into excel columns. */
+            string[,] TrainID = new string[excelPageSize+10, 1];
+            string[,] LocoID = new string[excelPageSize+10, 1];
+            DateTime[,] NotificationTime = new DateTime[excelPageSize+10, 1];
+            double[,] latitude = new double[excelPageSize+10, 1];
+            double[,] longitude = new double[excelPageSize+10, 1];
+            double[,] speed = new double[excelPageSize, 1];
+            double[,] kmPost = new double[excelPageSize, 1];
+            double[,] direction = new double[excelPageSize, 1];
+
+            int a;
+            /* Loop through the excel pages. */
+            for (int excelPage = 0; excelPage < excelPages; excelPage++)
+            {
+                /* Set the active worksheet. */
+                worksheet = (Microsoft.Office.Interop.Excel._Worksheet)workbook.Sheets[excelPage + 1];
+                workbook.Sheets[excelPage + 1].Activate();
+                worksheet.get_Range("A1", "H1").Value2 = headerString;
+
+                /* Loop through the data for each excel page. */
+                for (int j = 0; j < excelPageSize; j++)
+                {
+                    
+                    /* Check we dont try to read more data than there really is. */
+                    int checkIdx = j + excelPage * excelPageSize;
+                    if (checkIdx < trainRecords.Count())
+                    {
+                        TrainID[j, 0] = trainRecords[checkIdx].TrainID;
+                        LocoID[j, 0] = trainRecords[checkIdx].LocoID;
+                        NotificationTime[j, 0] = trainRecords[checkIdx].NotificationDateTime;
+                        latitude[j, 0] = trainRecords[checkIdx].latitude;
+                        longitude[j, 0] = trainRecords[checkIdx].longitude;
+                        speed[j, 0] = trainRecords[checkIdx].speed;
+                        kmPost[j, 0] = trainRecords[checkIdx].kmPost;
+                        direction[j, 0] = trainRecords[checkIdx].trainDirection;
+                    }
+                    else
+                    {
+                        /* The end of the data has been reached. Populate the remaining elements. */
+                        TrainID[j, 0] = "";
+                        LocoID[j, 0] = "";
+                        NotificationTime[j, 0] = DateTime.MinValue;
+                        latitude[j, 0] = 0.0;
+                        longitude[j, 0] = 0.0;
+                        speed[j, 0] = 0.0;
+                        kmPost[j, 0] = 0;
+                        direction[j, 0] = 0.0;
+                    }
+                }
+
+                /* Write the data to the active excel workseet. */
+                worksheet.get_Range("A" + headerOffset, "A" + (headerOffset + excelPageSize-1)).Value2 = TrainID;
+                worksheet.get_Range("B" + headerOffset, "B" + (headerOffset + excelPageSize-1)).Value2 = LocoID;
+                worksheet.get_Range("C" + headerOffset, "C" + (headerOffset + excelPageSize-1)).Value2 = NotificationTime;
+                worksheet.get_Range("D" + headerOffset, "D" + (headerOffset + excelPageSize-1)).Value2 = latitude;
+                worksheet.get_Range("E" + headerOffset, "E" + (headerOffset + excelPageSize-1)).Value2 = longitude;
+                worksheet.get_Range("F" + headerOffset, "F" + (headerOffset + excelPageSize-1)).Value2 = speed;
+                worksheet.get_Range("G" + headerOffset, "G" + (headerOffset + excelPageSize-1)).Value2 = kmPost;
+                worksheet.get_Range("H" + headerOffset, "H" + (headerOffset + excelPageSize-1)).Value2 = direction;
+
+            }
+
+            /* Generate the resulting file name and location to save to. */
+            string savePath = @"S:\Corporate Strategy\Infrastructure Strategies\Simulations\Train Performance Analysis";
+            string saveFilename = savePath + @"\ICEData_" + DateTime.Now.ToString("yyyyMMdd") + ".xlsx";
+
+            /* Check the file does not exist yet. */
+            if (File.Exists(saveFilename))
+                File.Delete(saveFilename);
+
+            /* Save the excel file. */
+            excel.UserControl = false;
+            workbook.SaveAs(saveFilename, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookDefault, Type.Missing, Type.Missing,
+                false, false, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange,
+                Type.Missing, Type.Missing, Type.Missing, Type.Missing, Type.Missing);
+
+            workbook.Close();
+
+            return;
+        }
     }
 }
