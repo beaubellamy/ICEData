@@ -67,7 +67,29 @@ namespace ICEData
 
     }
 
+    public class Train
+    {
+        public List<TrainDetails> TrainJourney;
+        public bool include;
 
+        public Train()
+        {
+            this.TrainJourney = null;
+            this.include = false;
+        }
+
+        public Train(List<TrainDetails> trainDetails)
+        {
+            this.TrainJourney = trainDetails;
+            this.include = true;
+        }
+        
+        public Train(List<TrainDetails> trainDetails, bool include)
+        {
+            this.TrainJourney = trainDetails;
+            this.include = include;
+        }
+    }
 
     class ICEData
     {
@@ -78,7 +100,13 @@ namespace ICEData
         [STAThread]
         static void Main(string[] args)
         {
-
+            /* Artificial input parameters. */
+            /* These parameters will be passed into the program. */
+            double[] latitude = new double[2] { -33.0, -35.0 };
+            double[] longitude = new double[2] { 150.0, 152.0};
+            DateTime[] dateRange = new DateTime[2] { new DateTime(2016, 1, 1), new DateTime(2016, 2, 1) };
+            //string[] trainList = new string[] {"1,","1PS6" };
+            //bool excludeTrainList = true;
 
             /* Use a browser to select the desired data file. */
             string filename = null;
@@ -96,10 +124,22 @@ namespace ICEData
             
             // Read the data
             List<TrainDetails> TrainRecords = new List<TrainDetails>();
-            TrainRecords = readICEData(filename);
+            TrainRecords = readICEData(filename, latitude, longitude, dateRange);
+
+            // Sort the date by [trainID, locoID, Date, Time, kmPost]
+            List<TrainDetails> OrderdTrainRecords = new List<TrainDetails>();
+            OrderdTrainRecords = TrainRecords.OrderBy(t => t.TrainID).ThenBy(t => t.LocoID).ThenBy(t => t.NotificationDateTime).ThenBy(t => t.kmPost).ToList();
+
+
+            // Clean data - remove trains with insufficient data
+            List<Train> CleanTrainRecords = new List<Train>();
+            CleanTrainRecords = CleanData(OrderdTrainRecords);
+
+            List<TrainDetails> unpackedData = new List<TrainDetails>();
+            unpackedData = unpackCleanData(CleanTrainRecords);
 
             // Write data to an excel file
-            writeTrainData(TrainRecords);
+            writeTrainData(unpackedData);
 
             tool.messageBox("Program Complete.");
         }
@@ -136,7 +176,7 @@ namespace ICEData
         /// </summary>
         /// <param name="filename">The filename of the ICE data</param>
         /// <returns>The list of trainDetails objects containnig each valid record.</returns>
-        public static List<TrainDetails> readICEData(string filename)
+        public static List<TrainDetails> readICEData(string filename, double[] latitudeRange, double[] longitudeRange, DateTime[] dateRange)
         {
             /* Read all the lines of the data file. */
             string[] lines = System.IO.File.ReadAllLines(filename);
@@ -164,7 +204,7 @@ namespace ICEData
             foreach (string line in lines)
             {
                 if (header)
-                    /* Ignore the field headers. */
+                    /* Ignore the header line. */
                     header = false;
                 else
                 {
@@ -178,15 +218,16 @@ namespace ICEData
                     double.TryParse(fields[11], out latitude);
                     double.TryParse(fields[13], out longitude);
                     double.TryParse(fields[5], out trainDirection);
-                    //DateTime.TryParseExact(fields[14], "dd/MM/yyyy HH:mm", null, System.Globalization.DateTimeStyles.AssumeLocal, out NotificationDateTime);
                     DateTime.TryParse(fields[14], out NotificationDateTime);
 
-                    // if record within range limits include in recordlist
-                    TrainDetails record = new TrainDetails(TrainID, locoID, NotificationDateTime, latitude, longitude, speed, kmPost, trainDirection);
-                    IceRecord.Add(record);
+                    if (latitude < latitudeRange[0] & latitude > latitudeRange[1] &
+                        longitude > longitudeRange[0] & longitude < longitudeRange[1] &
+                        NotificationDateTime >= dateRange[0] & NotificationDateTime < dateRange[1])
+                    {
+                        TrainDetails record = new TrainDetails(TrainID, locoID, NotificationDateTime, latitude, longitude, speed, kmPost, trainDirection);
+                        IceRecord.Add(record);
+                    }
 
-                
-                
                 }
             }
 
@@ -308,5 +349,103 @@ namespace ICEData
 
             return;
         }
+
+        /// <summary>
+        /// Remove the whole train journey that does not contain successive points that conform to 
+        /// the minimum distance threshold.
+        /// </summary>
+        /// <param name="OrderdTrainRecords">List of TrainDetail objects</param>
+        /// <returns>List of Train objects containign the journey details of each train.</returns>
+        public static List<Train> CleanData(List<TrainDetails> OrderdTrainRecords)
+        {
+            bool removeTrain = false;
+            double distanceThreshold = 4000; // metres
+
+            /* Place holder for the train records that are acceptable. */
+            List<TrainDetails> newTrainList = new List<TrainDetails>();
+            /* List of each Train with its journey details that is acceptable. */            
+            List<Train> cleanTrainList = new List<Train>();
+
+            /* Add the first record to the list. */
+            newTrainList.Add(OrderdTrainRecords[0]);
+
+            for (int trainIndex = 1; trainIndex < OrderdTrainRecords.Count(); trainIndex++ )
+            {
+                if (OrderdTrainRecords[trainIndex].TrainID.Equals(OrderdTrainRecords[trainIndex - 1].TrainID) &
+                    OrderdTrainRecords[trainIndex].LocoID.Equals(OrderdTrainRecords[trainIndex - 1].LocoID)  &
+                    (OrderdTrainRecords[trainIndex].NotificationDateTime - OrderdTrainRecords[trainIndex - 1].NotificationDateTime).TotalMinutes < 1440 )
+                {
+                    /* If the current and previous record represent the same train journey, add it to the list */
+                    newTrainList.Add(OrderdTrainRecords[trainIndex]);
+                    
+                    if (Math.Abs(OrderdTrainRecords[trainIndex].kmPost - OrderdTrainRecords[trainIndex-1].kmPost) > distanceThreshold)
+                    {
+                        /* If the distance between successive km points is greater than the
+                         * threshold then we want to remove this train from the data. 
+                         */
+                        removeTrain = true;
+                    }
+
+                }
+                else 
+                {
+                    /* The end of the train journey had been reached. */
+                    if (!removeTrain)
+                    {
+                        /* If all points are aceptable, add the train journey to the cleaned list. */
+                        Train item = new Train();
+                        item.TrainJourney = newTrainList.ToList();
+
+                        cleanTrainList.Add(item);
+                        
+                    }
+                    
+                    /* Reset the parameters for teh next train. */
+                    removeTrain = false;
+                    newTrainList.Clear();
+                    /* Add the first record of the new train journey. */
+                    newTrainList.Add(OrderdTrainRecords[trainIndex]);
+                }
+
+                /* The end of the records have been reached. */
+                if (trainIndex == OrderdTrainRecords.Count() -1 & !removeTrain)
+                {
+                    /* If all points are aceptable, add the train journey to the cleaned list. */
+                    Train item = new Train();
+                    item.TrainJourney = newTrainList.ToList();
+
+                    cleanTrainList.Add(item);
+                    
+                }
+                
+            }
+            
+            return cleanTrainList;
+            
+        }
+
+        /// <summary>
+        /// Unpack the Train data structure into a single list of TrainDetails objects.
+        /// </summary>
+        /// <param name="OrderdTrainRecords">The Train object containing a list of trains with there journey details.</param>
+        /// <returns>A single list of TrainDetail objects.</returns>
+        public static List<TrainDetails> unpackCleanData(List<Train> OrderdTrainRecords)
+        {
+            /* Place holder to store all train records in one list. */
+            List<TrainDetails> unpackedData = new List<TrainDetails>();
+            
+            /* Cycle through each train. */
+            foreach (Train train in OrderdTrainRecords)
+            {
+                /* Cycle through each record in the train journey. */
+                for (int i = 0; i < train.TrainJourney.Count(); i++)
+                {                    
+                    /* Add it to the list. */
+                    unpackedData.Add(train.TrainJourney[i]);
+                }
+            }
+            return unpackedData;
+        }
+
     }
 }
