@@ -30,7 +30,7 @@ namespace ICEData
         {
             this.TrainID = "none";
             this.LocoID = "none";
-            this.NotificationDateTime = new DateTime(2000,1,1,0,0,0);
+            this.NotificationDateTime = new DateTime(2000, 1, 1, 0, 0, 0);
             this.latitude = -33.8519;   //Sydney Harbour Bridge
             this.longitude = 151.2108;
             this.speed = 0;
@@ -62,9 +62,6 @@ namespace ICEData
 
         }
 
-
-
-
     }
 
     /// <summary>
@@ -87,13 +84,13 @@ namespace ICEData
         /// <summary>
         /// Train Object constructor.
         /// </summary>
-        /// <param name="trainDetails">The list of trainDetails objects containing the details of teh train journey.</param>
+        /// <param name="trainDetails">The list of trainDetails objects containing the details of the train journey.</param>
         public Train(List<TrainDetails> trainDetails)
         {
             this.TrainJourney = trainDetails;
             this.include = true;
         }
-        
+
 
         /// <summary>
         /// Train Object constructor.
@@ -108,7 +105,7 @@ namespace ICEData
     }
 
     /// <summary>
-    /// A class describing a geographoc location
+    /// A class describing a geographic location
     /// </summary>
     public class GeoLocation
     {
@@ -122,8 +119,9 @@ namespace ICEData
         /// </summary>
         public GeoLocation()
         {
-            this.latitude = -34;
-            this.longitude = 150;
+            // Default: Sydney Harbour Bridge
+            this.latitude = -33.8519;
+            this.longitude = 151.2108;
         }
 
         /// <summary>
@@ -136,7 +134,7 @@ namespace ICEData
             this.latitude = lat;
             this.longitude = lon;
         }
-        
+
         /// <summary>
         /// Geolocation constructor
         /// </summary>
@@ -147,10 +145,7 @@ namespace ICEData
             this.longitude = trainDetails.longitude;
         }
 
-        
 
-    
-    
     }
 
     class ICEData
@@ -165,17 +160,18 @@ namespace ICEData
             /* Artificial input parameters. */
             /* These parameters will be passed into the program. */
             double[] latitude = new double[2] { -33.0, -35.0 };
-            double[] longitude = new double[2] { 150.0, 152.0};
+            double[] longitude = new double[2] { 150.0, 152.0 };
             DateTime[] dateRange = new DateTime[2] { new DateTime(2016, 1, 1), new DateTime(2016, 2, 1) };
+            double minimumJourneyDistance = 40000;        // meteres, this will vary depending on the corridor under analysis.
             bool includeAListOfTrainsToExclude = false;
 
             /* Ensure there is a empty list of trains to exclude to start. */
-            List<string> excludeTrainList = new List<string> {};
+            List<string> excludeTrainList = new List<string> { };
 
             /* Use a browser to select the desired data file. */
             string filename = null;
             string trainList = null;
-            
+
             /* Select the data file and the trainList file. */
             filename = tool.browseFile("Select the data file.");
             if (includeAListOfTrainsToExclude)
@@ -193,10 +189,10 @@ namespace ICEData
             // Sort the date by [trainID, locoID, Date, Time, kmPost]
             List<TrainDetails> OrderdTrainRecords = new List<TrainDetails>();
             OrderdTrainRecords = TrainRecords.OrderBy(t => t.TrainID).ThenBy(t => t.LocoID).ThenBy(t => t.NotificationDateTime).ThenBy(t => t.kmPost).ToList();
-            
+
             // Clean data - remove trains with insufficient data
             List<Train> CleanTrainRecords = new List<Train>();
-            CleanTrainRecords = CleanData(OrderdTrainRecords);
+            CleanTrainRecords = CleanData(OrderdTrainRecords, minimumJourneyDistance);
 
             // Unpack teh records into a single trainDetails object list.
             List<TrainDetails> unpackedData = new List<TrainDetails>();
@@ -244,27 +240,27 @@ namespace ICEData
         {
             /* Read all the lines of the data file. */
             string[] lines = System.IO.File.ReadAllLines(filename);
-            char[] delimeters = {',', '\t' };
+            char[] delimeters = { ',', '\t' };
 
             /* Seperate the fields. */
             string[] fields = lines[0].Split(delimeters);
 
             /* Initialise the fields of interest. */
-            string TrainID = "none";    
-            string locoID = "none";     
-            double speed = 0.0;     
-            double kmPost = 0.0;    
-            double latitude = 0.0;  
-            double longitude = 0.0; 
-            double trainDirection = 0.0;    
-            DateTime NotificationDateTime = new DateTime(2000, 1, 1);   
-            
+            string TrainID = "none";
+            string locoID = "none";
+            double speed = 0.0;
+            double kmPost = 0.0;
+            double latitude = 0.0;
+            double longitude = 0.0;
+            double trainDirection = 0.0;
+            DateTime NotificationDateTime = new DateTime(2000, 1, 1);
+
             bool header = true;
             bool includeTrain = true;
 
             /* List of all valid train data. */
             List<TrainDetails> IceRecord = new List<TrainDetails>();
-            
+
             foreach (string line in lines)
             {
                 if (header)
@@ -302,7 +298,7 @@ namespace ICEData
             // Return the list of records.
             return IceRecord;
         }
-        
+
         /// <summary>
         /// This function reads the file with teh list of trains to exclude from the 
         /// data and stores the list in a managable list object.
@@ -325,7 +321,7 @@ namespace ICEData
             /* Add the trains to the list. */
             foreach (string line in lines)
                 excludeTrainList.Add(line);
-            
+
 
             return excludeTrainList;
         }
@@ -336,7 +332,7 @@ namespace ICEData
         /// <param name="trainRecords">The list of train details object containing all the train records.</param>
         public static void writeTrainData(List<TrainDetails> trainRecords)
         {
-            
+
             /* Create the microsfot excel references. */
             Microsoft.Office.Interop.Excel.Application excel;
             Microsoft.Office.Interop.Excel._Workbook workbook;
@@ -361,14 +357,14 @@ namespace ICEData
                 excelPageSize = trainRecords.Count();
             else
                 excelPages = (int)Math.Round((double)trainRecords.Count() / excelPageSize + 0.5);
-            
+
 
             /* Deconstruct the train details into excel columns. */
-            string[,] TrainID = new string[excelPageSize+10, 1];
-            string[,] LocoID = new string[excelPageSize+10, 1];
-            DateTime[,] NotificationTime = new DateTime[excelPageSize+10, 1];
-            double[,] latitude = new double[excelPageSize+10, 1];
-            double[,] longitude = new double[excelPageSize+10, 1];
+            string[,] TrainID = new string[excelPageSize + 10, 1];
+            string[,] LocoID = new string[excelPageSize + 10, 1];
+            DateTime[,] NotificationTime = new DateTime[excelPageSize + 10, 1];
+            double[,] latitude = new double[excelPageSize + 10, 1];
+            double[,] longitude = new double[excelPageSize + 10, 1];
             double[,] speed = new double[excelPageSize, 1];
             double[,] kmPost = new double[excelPageSize, 1];
             double[,] direction = new double[excelPageSize, 1];
@@ -385,7 +381,7 @@ namespace ICEData
                 /* Loop through the data for each excel page. */
                 for (int j = 0; j < excelPageSize; j++)
                 {
-                    
+
                     /* Check we dont try to read more data than there really is. */
                     int checkIdx = j + excelPage * excelPageSize;
                     if (checkIdx < trainRecords.Count())
@@ -414,14 +410,14 @@ namespace ICEData
                 }
 
                 /* Write the data to the active excel workseet. */
-                worksheet.get_Range("A" + headerOffset, "A" + (headerOffset + excelPageSize-1)).Value2 = TrainID;
-                worksheet.get_Range("B" + headerOffset, "B" + (headerOffset + excelPageSize-1)).Value2 = LocoID;
-                worksheet.get_Range("C" + headerOffset, "C" + (headerOffset + excelPageSize-1)).Value2 = NotificationTime;
-                worksheet.get_Range("D" + headerOffset, "D" + (headerOffset + excelPageSize-1)).Value2 = latitude;
-                worksheet.get_Range("E" + headerOffset, "E" + (headerOffset + excelPageSize-1)).Value2 = longitude;
-                worksheet.get_Range("F" + headerOffset, "F" + (headerOffset + excelPageSize-1)).Value2 = speed;
-                worksheet.get_Range("G" + headerOffset, "G" + (headerOffset + excelPageSize-1)).Value2 = kmPost;
-                worksheet.get_Range("H" + headerOffset, "H" + (headerOffset + excelPageSize-1)).Value2 = direction;
+                worksheet.get_Range("A" + headerOffset, "A" + (headerOffset + excelPageSize - 1)).Value2 = TrainID;
+                worksheet.get_Range("B" + headerOffset, "B" + (headerOffset + excelPageSize - 1)).Value2 = LocoID;
+                worksheet.get_Range("C" + headerOffset, "C" + (headerOffset + excelPageSize - 1)).Value2 = NotificationTime;
+                worksheet.get_Range("D" + headerOffset, "D" + (headerOffset + excelPageSize - 1)).Value2 = latitude;
+                worksheet.get_Range("E" + headerOffset, "E" + (headerOffset + excelPageSize - 1)).Value2 = longitude;
+                worksheet.get_Range("F" + headerOffset, "F" + (headerOffset + excelPageSize - 1)).Value2 = speed;
+                worksheet.get_Range("G" + headerOffset, "G" + (headerOffset + excelPageSize - 1)).Value2 = kmPost;
+                worksheet.get_Range("H" + headerOffset, "H" + (headerOffset + excelPageSize - 1)).Value2 = direction;
 
             }
 
@@ -449,85 +445,91 @@ namespace ICEData
         /// the minimum distance threshold.
         /// </summary>
         /// <param name="OrderdTrainRecords">List of TrainDetail objects</param>
+        /// <param name="minimumJourneyDistance">The minimum required distance a train must travel 
+        /// to be included in the analysis.</param>
         /// <returns>List of Train objects containign the journey details of each train.</returns>
-        public static List<Train> CleanData(List<TrainDetails> OrderdTrainRecords)
+        public static List<Train> CleanData(List<TrainDetails> OrderdTrainRecords, double minimumJourneyDistance)
         {
             bool removeTrain = false;
             double distanceThreshold = 4000; // metres
             double distance = 0;
+            double journeyDistance = 0;
 
             GeoLocation point1 = null;
             GeoLocation point2 = null;
 
             /* Place holder for the train records that are acceptable. */
             List<TrainDetails> newTrainList = new List<TrainDetails>();
-            /* List of each Train with its journey details that is acceptable. */            
+            /* List of each Train with its journey details that is acceptable. */
             List<Train> cleanTrainList = new List<Train>();
-           
+
             /* Add the first record to the list. */
             newTrainList.Add(OrderdTrainRecords[0]);
 
             for (int trainIndex = 1; trainIndex < OrderdTrainRecords.Count(); trainIndex++)
             {
-                
-                    if (OrderdTrainRecords[trainIndex].TrainID.Equals(OrderdTrainRecords[trainIndex - 1].TrainID) &&
-                        OrderdTrainRecords[trainIndex].LocoID.Equals(OrderdTrainRecords[trainIndex - 1].LocoID) &&
-                        (OrderdTrainRecords[trainIndex].NotificationDateTime - OrderdTrainRecords[trainIndex - 1].NotificationDateTime).TotalMinutes < 1440)
+
+
+                if (OrderdTrainRecords[trainIndex].TrainID.Equals(OrderdTrainRecords[trainIndex - 1].TrainID) &&
+                    OrderdTrainRecords[trainIndex].LocoID.Equals(OrderdTrainRecords[trainIndex - 1].LocoID) &&
+                    (OrderdTrainRecords[trainIndex].NotificationDateTime - OrderdTrainRecords[trainIndex - 1].NotificationDateTime).TotalMinutes < 1440)
+                {
+                    /* If the current and previous record represent the same train journey, add it to the list */
+                    newTrainList.Add(OrderdTrainRecords[trainIndex]);
+
+                    point1 = new GeoLocation(OrderdTrainRecords[trainIndex - 1]);
+                    point2 = new GeoLocation(OrderdTrainRecords[trainIndex]);
+
+                    distance = tool.calculateDistance(point1, point2);
+                    journeyDistance = journeyDistance + distance;
+
+                    if (distance > distanceThreshold)
                     {
-                        /* If the current and previous record represent the same train journey, add it to the list */
-                        newTrainList.Add(OrderdTrainRecords[trainIndex]);
-                        
-                        point1 = new GeoLocation(OrderdTrainRecords[trainIndex-1]);
-                        point2 = new GeoLocation(OrderdTrainRecords[trainIndex]);
-
-                        distance = tool.calculateDistance(point1, point2);
-
-                        if (distance > distanceThreshold)
-                        {
-                            /* If the distance between successive km points is greater than the
-                             * threshold then we want to remove this train from the data. 
-                             */
-                            removeTrain = true;
-                        }
-
-                    }
-                    else
-                    {
-                        /* The end of the train journey had been reached. */
-                        if (!removeTrain)
-                        {
-                            /* If all points are aceptable, add the train journey to the cleaned list. */
-                            Train item = new Train();
-                            item.TrainJourney = newTrainList.ToList();
-
-                            cleanTrainList.Add(item);
-
-                        }
-
-                        /* Reset the parameters for the next train. */
-                        removeTrain = false;
-                        newTrainList.Clear();
-                        /* Add the first record of the new train journey. */
-                        newTrainList.Add(OrderdTrainRecords[trainIndex]);
+                        /* If the distance between successive km points is greater than the
+                         * threshold then we want to remove this train from the data. 
+                         */
+                        removeTrain = true;
                     }
 
-                    /* The end of the records have been reached. */
-                    if (trainIndex == OrderdTrainRecords.Count() - 1 && !removeTrain)
+                }
+                else
+                {
+                    /* The end of the train journey had been reached. */
+                    if (!removeTrain && journeyDistance > minimumJourneyDistance)
                     {
-                        /* If all points are aceptable, add the train journey to the cleaned list. */
+                        /* If all points are acceptable and the train ravels the minimum distance, 
+                         * add the train journey to the cleaned list. 
+                         */
                         Train item = new Train();
                         item.TrainJourney = newTrainList.ToList();
 
                         cleanTrainList.Add(item);
 
                     }
-                
-               
+
+                    /* Reset the parameters for the next train. */
+                    removeTrain = false;
+                    journeyDistance = 0;
+                    newTrainList.Clear();
+                    /* Add the first record of the new train journey. */
+                    newTrainList.Add(OrderdTrainRecords[trainIndex]);
+                }
+
+                /* The end of the records have been reached. */
+                if (trainIndex == OrderdTrainRecords.Count() - 1 && !removeTrain)
+                {
+                    /* If all points are aceptable, add the train journey to the cleaned list. */
+                    Train item = new Train();
+                    item.TrainJourney = newTrainList.ToList();
+
+                    cleanTrainList.Add(item);
+
+                }
+
             }
-            
 
             return cleanTrainList;
-            
+
         }
 
         /// <summary>
@@ -539,13 +541,13 @@ namespace ICEData
         {
             /* Place holder to store all train records in one list. */
             List<TrainDetails> unpackedData = new List<TrainDetails>();
-            
+
             /* Cycle through each train. */
             foreach (Train train in OrderdTrainRecords)
             {
                 /* Cycle through each record in the train journey. */
                 for (int i = 0; i < train.TrainJourney.Count(); i++)
-                {                    
+                {
                     /* Add it to the list. */
                     unpackedData.Add(train.TrainJourney[i]);
                 }

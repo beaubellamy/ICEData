@@ -187,7 +187,8 @@ namespace ICEData
         }
 
         /// <summary>
-        /// Calculates the distance between two points using the haversine formula.
+        /// Calculates the great circle distance between two points on a sphere 
+        /// given there latitudes and longitudes.
         /// </summary>
         /// <param name="point1">Geographic location containinig the latitude and longitude of the reference location.</param>
         /// <param name="point2">Geographic location containinig the latitude and longitude of the destination location.</param>
@@ -195,9 +196,9 @@ namespace ICEData
         public double calculateDistance(GeoLocation point1, GeoLocation point2)
         {
 
-            double arcsine = Math.Sin(degress2radians(point2.latitude - point1.latitude)) * Math.Sin(degress2radians(point2.latitude - point1.latitude)) +
+            double arcsine = Math.Sin(degress2radians((point2.latitude - point1.latitude)/2)) * Math.Sin(degress2radians((point2.latitude - point1.latitude)/2)) +
                 Math.Cos(degress2radians(point1.latitude)) * Math.Cos(degress2radians(point2.latitude)) *
-                Math.Sin(degress2radians(point2.longitude - point1.longitude)) * Math.Sin(degress2radians(point2.longitude - point1.longitude));
+                Math.Sin(degress2radians((point2.longitude - point1.longitude)/2)) * Math.Sin(degress2radians((point2.longitude - point1.longitude)/2));
             double arclength = 2 * Math.Atan2(Math.Sqrt(arcsine), Math.Sqrt(1 - arcsine));
 
             return EarthRadius * arclength;
