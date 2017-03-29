@@ -14,6 +14,7 @@ namespace ICEData
         double elevation;
         double kilometreage;
         double virtualKilometreage;
+        bool isLoopHere;
 
         Tools tool = new Tools();
 
@@ -31,6 +32,7 @@ namespace ICEData
             this.elevation = 0;
             this.kilometreage = 0;
             this.virtualKilometreage = 0;
+            this.isLoopHere = false;
         }
 
         /// <summary>
@@ -43,7 +45,8 @@ namespace ICEData
         /// <param name="elevation">The elevation of the track.</param>
         /// <param name="kilometreage">The kilometreage of the track.</param>
         /// <param name="virtualKilometreage">The cummulative kilometreage for a single corridor track.</param>
-        public trackGeometry(int corridorNumber, string corridorName, double latitude, double longitude, double elevation, double kilometreage, double virtualKilometreage)
+        /// <param name="loop">A flag indicating if a loop is located at this location.</param>
+        public trackGeometry(int corridorNumber, string corridorName, double latitude, double longitude, double elevation, double kilometreage, double virtualKilometreage, bool loop)
         {
             this.corridorNumber = corridorNumber;
             this.corridorName = corridorName;
@@ -52,6 +55,7 @@ namespace ICEData
             this.elevation = elevation;
             this.kilometreage = kilometreage;
             this.virtualKilometreage = virtualKilometreage;
+            this.isLoopHere = loop;
         }
 
         /// <summary>
@@ -82,6 +86,7 @@ namespace ICEData
             double elevation = 0.0;
             double kilometreage = 0.0;
             double virtualKilometreage = 0.0;
+            bool isLoopHere = false;
 
             /* Define some additional helper parameters. */
             double distance = 0;
@@ -89,6 +94,7 @@ namespace ICEData
             double previousLat = 0;
             double previousLong = 0;
             double previouskm = 0;
+            string loop;
 
             /* Add the trains to the list. */
             foreach (string line in lines)
@@ -106,6 +112,12 @@ namespace ICEData
                     double.TryParse(fields[2], out longitude);
                     double.TryParse(fields[3], out elevation);
                     double.TryParse(fields[4], out kilometreage);
+                    loop = fields[6];
+
+                    if (loop.Equals("loop", StringComparison.OrdinalIgnoreCase) || loop.Equals("true", StringComparison.OrdinalIgnoreCase))
+                        isLoopHere = true;
+                    else
+                        isLoopHere = false;
 
                     /* The virtual kilometreage starts at the first kilometreage of the track. */
                     if (firstPoint == 0)
@@ -145,7 +157,7 @@ namespace ICEData
                     }
               
                 /* Add the geometry point to the list. */
-                trackGeometry geometry = new trackGeometry(0, geometryName, latitude, longitude, elevation, kilometreage, virtualKilometreage);
+                trackGeometry geometry = new trackGeometry(0, geometryName, latitude, longitude, elevation, kilometreage, virtualKilometreage, isLoopHere);
                 trackGeometry.Add(geometry);
                 }
             }

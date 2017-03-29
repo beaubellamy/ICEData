@@ -231,9 +231,7 @@ namespace ICEData
                 return direction.decreasing;
 
         }
-
-       
-
+        
         /// <summary>
         /// Function populates the direction parameter for the train.
         /// </summary>
@@ -283,6 +281,84 @@ namespace ICEData
                        
         }
 
+
+        public void interpolateTrainData(List<Train> trains)
+        { 
+            
+            /* Consider making this an input parameter */
+            double interval = 50.0;     // metres
+            double startKm = 5;
+            double endKm = 70;
+
+            //double gradient = 0;
+            //double intercept = 0;
+            double interpolatedSpeed = 0;
+
+            /* New train list */
+            List<Train> newTrainList = new List<Train>();
+            List<TrainDetails> journey = new List<TrainDetails>();
+
+            for (int trainidx = 0; trainidx < trains.Count(); trainidx++)
+            {
+                journey = trains[trainidx].TrainJourney;
+                int journeyIdx = 0;
+                double currentKm = startKm;
+                double currentTrainKm = journey[journeyIdx].geometryKm;
+
+                while (currentKm < endKm)
+                {
+                
+                }
+
+
+
+
+                // rethink this loop
+                //while (currentTrainKm < endKm)
+                //{
+                //    if (currentKm < journey[journeyIdx].geometryKm)
+                //    {
+                //        interpolatedSpeed = 0;
+                //        currentKm = currentKm + interval/1000;
+                //    }
+                //    else if (journeyIdx == journey.Count() - 1) // maybe - 2 becaue we are looking forward for interpolation
+                //    {
+                //        interpolatedSpeed = 0;
+                //        currentKm = currentKm + interval / 1000;
+                //    }
+                //    else
+                //    {
+
+                //        while (journey[journeyIdx+1].geometryKm <= currentKm)
+                //        {
+                //            //gradient = (journey[journeyIdx+1].speed - journey[journeyIdx].speed) /
+                //            //            (journey[journeyIdx+1].geometryKm - journey[journeyIdx].geometryKm);
+                //            //intercept = journey[journeyIdx].speed - gradient * journey[journeyIdx].geometryKm;
+
+                //            //interpolatedSpeed = gradient * currentKm + interpolatedSpeed;
+                //            interpolatedSpeed = linear(currentKm, journey[journeyIdx].geometryKm, journey[journeyIdx + 1].geometryKm, journey[journeyIdx].speed, journey[journeyIdx + 1].speed);
+                //            currentKm = currentKm + interval / 1000;
+                //        }
+                //        journeyIdx++;
+
+                //    }
+                    
+                    
+                //}
+            
+            }
+
+
+        }
+
+        private double linear(double targetX, double X0, double X1, double Y0, double Y1)
+        {
+            if ((X1 - X0) == 0)
+                return (Y0 + Y1) / 2;
+
+            return Y0 + (targetX - X0) * (Y1 - Y0) / (X1 - X0);
+        
+        }
 
     }
 }

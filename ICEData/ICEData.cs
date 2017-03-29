@@ -18,8 +18,7 @@ namespace ICEData
     /// </summary>
     public class TrainDetails
     {
-        //public enum direction { increasing, decreasing, notSpecified };
-    
+           
         public string TrainID;
         public string LocoID;
         public DateTime NotificationDateTime;
@@ -165,8 +164,9 @@ namespace ICEData
     class ICEData
     {
 
-        /* Create a tools Object. */
+        /* Create a tools object. */
         public static Tools tool = new Tools();
+        /* Create a trackGeometry object. */
         public static trackGeometry track = new trackGeometry();
 
 
@@ -216,6 +216,13 @@ namespace ICEData
             /* Clean data - remove trains with insufficient data. */
             List<Train> CleanTrainRecords = new List<Train>();
             CleanTrainRecords = CleanData(trackGeometry, OrderdTrainRecords, minimumJourneyDistance);
+
+            /* interpolate data */
+            /****** Only required while we dont have the data in the perferred format *****/
+
+            /* Average the train data for each direction with regard for TSR's and loop locations. */
+            
+            /* seprate averages for P/W ratio groups, commodity, Operator */
 
             /* Unpack the records into a single trainDetails object list. */
             List<TrainDetails> unpackedData = new List<TrainDetails>();
@@ -301,6 +308,7 @@ namespace ICEData
                     double.TryParse(fields[11], out latitude);
                     double.TryParse(fields[13], out longitude);
                     DateTime.TryParse(fields[14], out NotificationDateTime);
+                    /* possible TSR information as well*/
 
                     /* Check if the train is in the exclude list */
                     includeTrain = excludeTrainList.Contains(TrainID);
