@@ -282,9 +282,179 @@ namespace ICEData
         }
 
 
-        public void interpolateTrainData(List<Train> trains)
-        { 
+        public List<Train> interpolateTrainData(List<Train> trains)
+        {
+
+            /* Consider making this an input parameter */
+            double interval = 50.0;     // metres
+            double startKm = 5;
+            double endKm = 70;
+            double previousKm = 0;
+            double currentKm = 0;
+            double currentTrainKm = 0;
+
+            DateTime time = new DateTime();
+            direction trainDirection = direction.notSpecified;
+            bool timeChange = false;
+
+            //double gradient = 0;
+            //double intercept = 0;
+            double interpolatedSpeed = 0;
+            double X0, X1, Y0, Y1;
+
+            /* New train list */
+            List<Train> newTrainList = new List<Train>();
+            List<TrainDetails> journey = new List<TrainDetails>();
+
+            for (int trainidx = 0; trainidx < trains.Count(); trainidx++)
+            {
+                List<InterpolatedTrain> interpolatedTrainList = new List<InterpolatedTrain>();
             
+                journey = trains[trainidx].TrainJourney;
+                
+                int journeyIdx = 0;
+                //timeChange = false;
+
+                if (journey[journeyIdx].trainDirection == direction.increasing)
+                {
+                    currentKm = startKm;
+                    currentTrainKm = journey[journeyIdx].geometryKm;
+
+                    while (currentKm < endKm)
+                    {
+
+                        if (journeyIdx > 0 && journeyIdx < journey.Count())   // maybe count-1
+                        {
+                            X0 = journey[journeyIdx - 1].geometryKm;
+                            X1 = journey[journeyIdx].geometryKm;
+                            Y0 = journey[journeyIdx - 1].speed;
+                            Y1 = journey[journeyIdx].speed;
+                            if (timeChange)
+                            {
+                                time = journey[journeyIdx - 1].NotificationDateTime;
+                                timeChange = false;
+                            }
+                        }
+                        else
+                        {
+                            X0 = currentKm;
+                            X1 = X0;
+                            Y0 = 0.0;
+                            Y1 = Y0;
+                            time = new DateTime();
+                        }
+
+                        if (currentKm <= X0) // <=
+                            interpolatedSpeed = 0;
+                        else// if (currentKm > Y0)
+                            interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
+                        //else
+                        //   interpolatedSpeed = 0; // linear(currentKm, X0, X1, Y0, Y1);
+
+                        previousKm = currentKm;
+                        currentKm = currentKm + interval / 1000;
+
+                        //calculateTimeInterval(previousKm, currentKm, interpolatedSpeed);
+                        if (interpolatedSpeed > 0)
+                            time = time.AddHours(calculateTimeInterval(previousKm, currentKm, interpolatedSpeed));
+
+                        InterpolatedTrain item = new InterpolatedTrain(trains[trainidx].TrainJourney[0].TrainID, trains[trainidx].TrainJourney[0].LocoID, 
+                                                                        time, previousKm, interpolatedSpeed);
+                        interpolatedTrainList.Add(item);
+
+
+                        if (journeyIdx < journey.Count)
+                            if (currentKm >= journey[journeyIdx].geometryKm)
+                            {
+                                journeyIdx++;
+                                timeChange = true;
+                            }
+
+                    }
+                    //interval = 50;
+
+                }
+                else if (journey[journeyIdx].trainDirection == direction.decreasing)
+                {
+                    currentKm = endKm;
+                    currentTrainKm = journey[journeyIdx].geometryKm;
+
+                    while (currentKm > startKm)
+                    {
+                        if (currentKm < 14.1)
+                            interval = 50;
+
+
+                        if (journeyIdx > 0 && journeyIdx < journey.Count())   // maybe count-1
+                        {
+                            X0 = journey[journeyIdx - 1].geometryKm;
+                            X1 = journey[journeyIdx].geometryKm;
+                            Y0 = journey[journeyIdx - 1].speed;
+                            Y1 = journey[journeyIdx].speed;
+                            if (timeChange)
+                            {
+                                time = journey[journeyIdx - 1].NotificationDateTime;
+                                timeChange = false;
+                            }
+                        }
+                        else
+                        {
+                            X0 = currentKm;
+                            X1 = X0;
+                            Y0 = 0.0;
+                            Y1 = Y0;
+                            time = new DateTime();
+                        }
+
+                        if (currentKm < X0) 
+                            interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
+                        else //if (currentKm >= Y0)
+                            interpolatedSpeed = 0;
+                        //else
+                        //    interpolatedSpeed = 0; // linear(currentKm, X0, X1, Y0, Y1);
+
+                        previousKm = currentKm;
+                        currentKm = currentKm - interval / 1000;
+
+                        if (interpolatedSpeed > 0)
+                            time = time.AddHours(calculateTimeInterval(previousKm, currentKm, interpolatedSpeed));
+
+                        InterpolatedTrain item = new InterpolatedTrain(trains[trainidx].TrainJourney[0].TrainID, trains[trainidx].TrainJourney[0].LocoID,
+                                                                        time, previousKm, interpolatedSpeed);
+                        interpolatedTrainList.Add(item);
+
+                        if (journeyIdx < journey.Count)
+                            if (currentKm <= journey[journeyIdx].geometryKm)
+                            {
+                                journeyIdx++;
+                                timeChange = true;
+                            }
+
+
+                    }
+
+                    //interval = 50;
+
+                }
+                else 
+                { 
+                    /* direction is not defined. There is an error. */                
+                }
+
+
+                Train trainItem = new Train(interpolatedTrainList, journey[0].trainDirection, true);
+                newTrainList.Add(trainItem);
+                
+
+
+            }
+
+            return newTrainList;
+        }
+
+        public void interpolateIncreasingTrainData(List<Train> trains)
+        {
+
             /* Consider making this an input parameter */
             double interval = 50.0;     // metres
             double startKm = 5;
@@ -293,6 +463,7 @@ namespace ICEData
             //double gradient = 0;
             //double intercept = 0;
             double interpolatedSpeed = 0;
+            double X0, X1, Y0, Y1;
 
             /* New train list */
             List<Train> newTrainList = new List<Train>();
@@ -307,45 +478,69 @@ namespace ICEData
 
                 while (currentKm < endKm)
                 {
-                
+                    X0 = journey[journeyIdx].speed;
+                    X1 = journey[journeyIdx + 1].speed;
+                    Y0 = journey[journeyIdx].geometryKm;
+                    Y1 = journey[journeyIdx + 1].geometryKm;
+
+                    interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
+
+                    currentKm = currentKm + interval / 1000;
+
+                    if (currentKm >= Y1)
+                        journeyIdx++;
+
+
                 }
 
 
+            }
 
 
-                // rethink this loop
-                //while (currentTrainKm < endKm)
-                //{
-                //    if (currentKm < journey[journeyIdx].geometryKm)
-                //    {
-                //        interpolatedSpeed = 0;
-                //        currentKm = currentKm + interval/1000;
-                //    }
-                //    else if (journeyIdx == journey.Count() - 1) // maybe - 2 becaue we are looking forward for interpolation
-                //    {
-                //        interpolatedSpeed = 0;
-                //        currentKm = currentKm + interval / 1000;
-                //    }
-                //    else
-                //    {
+        }
 
-                //        while (journey[journeyIdx+1].geometryKm <= currentKm)
-                //        {
-                //            //gradient = (journey[journeyIdx+1].speed - journey[journeyIdx].speed) /
-                //            //            (journey[journeyIdx+1].geometryKm - journey[journeyIdx].geometryKm);
-                //            //intercept = journey[journeyIdx].speed - gradient * journey[journeyIdx].geometryKm;
+        public void interpolateDecreasingTrainData(List<Train> trains)
+        {
 
-                //            //interpolatedSpeed = gradient * currentKm + interpolatedSpeed;
-                //            interpolatedSpeed = linear(currentKm, journey[journeyIdx].geometryKm, journey[journeyIdx + 1].geometryKm, journey[journeyIdx].speed, journey[journeyIdx + 1].speed);
-                //            currentKm = currentKm + interval / 1000;
-                //        }
-                //        journeyIdx++;
+            /* Consider making this an input parameter */
+            double interval = 50.0;     // metres
+            double startKm = 70;
+            double endKm = 5;
 
-                //    }
-                    
-                    
-                //}
-            
+            //double gradient = 0;
+            //double intercept = 0;
+            double interpolatedSpeed = 0;
+            double X0, X1, Y0, Y1;
+
+            /* New train list */
+            List<Train> newTrainList = new List<Train>();
+            List<TrainDetails> journey = new List<TrainDetails>();
+
+            for (int trainidx = 0; trainidx < trains.Count(); trainidx++)
+            {
+                journey = trains[trainidx].TrainJourney;
+                int journeyIdx = 0;
+                double currentKm = startKm;
+                double currentTrainKm = journey[journeyIdx].geometryKm;
+
+                while (currentKm > endKm)
+                {
+                    X0 = journey[journeyIdx].speed;
+                    X1 = journey[journeyIdx + 1].speed;
+                    Y0 = journey[journeyIdx].geometryKm;
+                    Y1 = journey[journeyIdx + 1].geometryKm;
+
+                    interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
+
+                    currentKm = currentKm - interval / 1000;
+
+                    if (currentKm >= Y1)
+                        journeyIdx++;
+
+
+                }
+
+
             }
 
 
@@ -358,6 +553,12 @@ namespace ICEData
 
             return Y0 + (targetX - X0) * (Y1 - Y0) / (X1 - X0);
         
+        }
+        
+        private double calculateTimeInterval(double startPositon, double endPosition, double speed)
+        {
+            return Math.Abs(endPosition - startPositon) / speed;    // hours.
+
         }
 
     }

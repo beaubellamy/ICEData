@@ -113,6 +113,60 @@ namespace ICEData
             this.TrainJourney = trainDetails;
             this.include = include;
         }
+
+        public Train(List<InterpolatedTrain> trainDetails,  direction trainDirection, bool include)
+        {
+
+            List<TrainDetails> journey = new List<TrainDetails>();
+
+            for (int i = 0; i < trainDetails.Count(); i++)
+            {
+                TrainDetails newitem = new TrainDetails(trainDetails[i].TrainID, trainDetails[i].LocoID, trainDetails[i].NotificationDateTime, 0, 0, 
+                                                        trainDetails[i].speed, 0, trainDetails[i].geometryKm, trainDirection);
+                journey.Add(newitem);
+
+            }
+            this.TrainJourney = journey;
+            this.include = include;
+        }
+ 
+    }
+
+
+    public class InterpolatedTrain
+    {
+        public string TrainID;
+        public string LocoID;
+        public DateTime NotificationDateTime;
+        public double speed;
+        public double geometryKm;
+
+        public InterpolatedTrain()
+        { 
+            this.TrainID = null;
+            this.LocoID = null;
+            this.NotificationDateTime = new DateTime(2000, 1, 1, 0, 0, 0);
+            this.speed = 0;
+            this.geometryKm = 0;
+        }
+
+        public InterpolatedTrain(string TrainID, string locoID, DateTime NotificationDateTime, double geometryKm, double speed)
+        {
+            this.TrainID = TrainID;
+            this.LocoID = locoID;
+            this.NotificationDateTime = NotificationDateTime;
+            this.geometryKm = geometryKm;
+            this.speed = speed;
+        }
+
+        public InterpolatedTrain(TrainDetails details)
+        {
+            this.TrainID = details.TrainID;
+            this.LocoID = details.LocoID;
+            this.NotificationDateTime = details.NotificationDateTime;
+            this.geometryKm = details.geometryKm;
+            this.speed = details.speed;
+        }
     }
 
     /// <summary>
@@ -218,7 +272,12 @@ namespace ICEData
             CleanTrainRecords = CleanData(trackGeometry, OrderdTrainRecords, minimumJourneyDistance);
 
             /* interpolate data */
-            /****** Only required while we dont have the data in the perferred format *****/
+            /****** Only required while we dont have the data in the preferred format *****/
+            List<Train> interpolatedRecords = new List<Train>();
+            interpolatedRecords = tool.interpolateTrainData(CleanTrainRecords);
+            List<InterpolatedTrain> unpackedInterpolation = new List<InterpolatedTrain>();
+            unpackedInterpolation = unpackInterpolatedData(interpolatedRecords);
+            writeTrainData(unpackedInterpolation);
 
             /* Average the train data for each direction with regard for TSR's and loop locations. */
             
@@ -375,7 +434,7 @@ namespace ICEData
             workbook = (Microsoft.Office.Interop.Excel._Workbook)(excel.Workbooks.Add(""));
 
             /* Create the header details. */
-            string[] headerString = { "Train ID", "loco ID", " Notification Date Time", "Latitude", "Longitude", "Speed", "km Post", "Train Direction" };
+            string[] headerString = { "Train ID", "loco ID", " Notification Date Time", "Latitude", "Longitude", "Speed", "km Post", "Actual Km", "Train Direction" };
 
             /* Pagenate the data for writing to excel. */
             int excelPageSize = 1000000;        /* Page size of the excel worksheet. */
@@ -407,7 +466,7 @@ namespace ICEData
                 /* Set the active worksheet. */
                 worksheet = (Microsoft.Office.Interop.Excel._Worksheet)workbook.Sheets[excelPage + 1];
                 workbook.Sheets[excelPage + 1].Activate();
-                worksheet.get_Range("A1", "H1").Value2 = headerString;
+                worksheet.get_Range("A1", "I1").Value2 = headerString;
 
                 /* Loop through the data for each excel page. */
                 for (int j = 0; j < excelPageSize; j++)
@@ -458,6 +517,112 @@ namespace ICEData
             /* Generate the resulting file name and location to save to. */
             string savePath = @"S:\Corporate Strategy\Infrastructure Strategies\Simulations\Train Performance Analysis";
             string saveFilename = savePath + @"\ICEData_" + DateTime.Now.ToString("yyyyMMdd") + ".xlsx";
+
+            /* Check the file does not exist yet. */
+            if (File.Exists(saveFilename))
+                File.Delete(saveFilename);
+
+            /* Save the excel file. */
+            excel.UserControl = false;
+            workbook.SaveAs(saveFilename, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookDefault, Type.Missing, Type.Missing,
+                false, false, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange,
+                Type.Missing, Type.Missing, Type.Missing, Type.Missing, Type.Missing);
+
+            workbook.Close();
+
+            return;
+        }
+
+        public static void writeTrainData(List<InterpolatedTrain> trainRecords)
+        {
+
+            /* Create the microsfot excel references. */
+            Microsoft.Office.Interop.Excel.Application excel;
+            Microsoft.Office.Interop.Excel._Workbook workbook;
+            Microsoft.Office.Interop.Excel._Worksheet worksheet;
+
+            /* Start Excel and get Application object. */
+            excel = new Microsoft.Office.Interop.Excel.Application();
+
+            /* Get the reference to the new workbook. */
+            workbook = (Microsoft.Office.Interop.Excel._Workbook)(excel.Workbooks.Add(""));
+            
+            /*public string TrainID;
+        public string LocoID;
+        public DateTime NotificationDateTime;
+        public double speed;
+        public double geometryKm;*/
+
+            /* Create the header details. */
+            string[] headerString = { "Train ID", "loco ID", " Notification Date Time", "Actual Km",  "Speed" };
+
+            /* Pagenate the data for writing to excel. */
+            int excelPageSize = 1000000;        /* Page size of the excel worksheet. */
+            int excelPages = 1;                 /* Number of Excel pages to write. */
+            int headerOffset = 2;
+
+            /* Adjust the excel page size or the number of pages to write. */
+            if (trainRecords.Count() < excelPageSize)
+                excelPageSize = trainRecords.Count();
+            else
+                excelPages = (int)Math.Round((double)trainRecords.Count() / excelPageSize + 0.5);
+
+
+            /* Deconstruct the train details into excel columns. */
+            string[,] TrainID = new string[excelPageSize + 10, 1];
+            string[,] LocoID = new string[excelPageSize + 10, 1];
+            DateTime[,] NotificationTime = new DateTime[excelPageSize + 10, 1];
+            double[,] speed = new double[excelPageSize, 1];
+            double[,] geometryKm = new double[excelPageSize, 1];
+           
+
+            /* Loop through the excel pages. */
+            for (int excelPage = 0; excelPage < excelPages; excelPage++)
+            {
+                /* Set the active worksheet. */
+                worksheet = (Microsoft.Office.Interop.Excel._Worksheet)workbook.Sheets[excelPage + 1];
+                workbook.Sheets[excelPage + 1].Activate();
+                worksheet.get_Range("A1", "E1").Value2 = headerString;
+
+                /* Loop through the data for each excel page. */
+                for (int j = 0; j < excelPageSize; j++)
+                {
+
+                    /* Check we dont try to read more data than there really is. */
+                    int checkIdx = j + excelPage * excelPageSize;
+                    if (checkIdx < trainRecords.Count())
+                    {
+                        TrainID[j, 0] = trainRecords[checkIdx].TrainID;
+                        LocoID[j, 0] = trainRecords[checkIdx].LocoID;
+                        NotificationTime[j, 0] = trainRecords[checkIdx].NotificationDateTime;
+                        speed[j, 0] = trainRecords[checkIdx].speed;
+                        geometryKm[j, 0] = trainRecords[checkIdx].geometryKm;
+                        
+                    }
+                    else
+                    {
+                        /* The end of the data has been reached. Populate the remaining elements. */
+                        TrainID[j, 0] = "";
+                        LocoID[j, 0] = "";
+                        NotificationTime[j, 0] = DateTime.MinValue;
+                        speed[j, 0] = 0.0;
+                        geometryKm[j, 0] = 0.0;
+                        
+                    }
+                }
+
+                /* Write the data to the active excel workseet. */
+                worksheet.get_Range("A" + headerOffset, "A" + (headerOffset + excelPageSize - 1)).Value2 = TrainID;
+                worksheet.get_Range("B" + headerOffset, "B" + (headerOffset + excelPageSize - 1)).Value2 = LocoID;
+                worksheet.get_Range("C" + headerOffset, "C" + (headerOffset + excelPageSize - 1)).Value2 = NotificationTime;
+                worksheet.get_Range("D" + headerOffset, "D" + (headerOffset + excelPageSize - 1)).Value2 = geometryKm;
+                worksheet.get_Range("E" + headerOffset, "E" + (headerOffset + excelPageSize - 1)).Value2 = speed;
+                
+            }
+
+            /* Generate the resulting file name and location to save to. */
+            string savePath = @"S:\Corporate Strategy\Infrastructure Strategies\Simulations\Train Performance Analysis";
+            string saveFilename = savePath + @"\ICEData_Interpolated" + DateTime.Now.ToString("yyyyMMdd") + ".xlsx";
 
             /* Check the file does not exist yet. */
             if (File.Exists(saveFilename))
@@ -603,5 +768,23 @@ namespace ICEData
             return unpackedData;
         }
 
+
+        public static List<InterpolatedTrain> unpackInterpolatedData(List<Train> OrderdTrainRecords)
+        {
+            /* Place holder to store all train records in one list. */
+            List<InterpolatedTrain> unpackedData = new List<InterpolatedTrain>();
+
+            /* Cycle through each train. */
+            foreach (Train train in OrderdTrainRecords)
+            {
+                /* Cycle through each record in the train journey. */
+                for (int i = 0; i < train.TrainJourney.Count(); i++)
+                {
+                    /* Add it to the list. */
+                    unpackedData.Add(new InterpolatedTrain(train.TrainJourney[i]));
+                }
+            }
+            return unpackedData;
+        }
     }
 }
