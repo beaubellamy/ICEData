@@ -250,7 +250,7 @@ namespace ICEData
         }
 
         /// <summary>
-        /// Function populates the geometry km information based on the calculated distance from the first km post.
+        /// Populate the geometry km information based on the calculated distance from the first km post.
         /// </summary>
         /// <param name="train">A train object.</param>
         public void populateGeometryKm(Train train)
@@ -280,286 +280,275 @@ namespace ICEData
             }
                        
         }
-
-
-        public List<Train> interpolateTrainData(List<Train> trains)
-        {
-
-            /* Consider making this an input parameter */
-            double interval = 50.0;     // metres
-            double startKm = 5;
-            double endKm = 70;
-            double previousKm = 0;
-            double currentKm = 0;
-            double currentTrainKm = 0;
-
-            DateTime time = new DateTime();
-            direction trainDirection = direction.notSpecified;
-            bool timeChange = false;
-
-            //double gradient = 0;
-            //double intercept = 0;
-            double interpolatedSpeed = 0;
-            double X0, X1, Y0, Y1;
-
-            /* New train list */
-            List<Train> newTrainList = new List<Train>();
-            List<TrainDetails> journey = new List<TrainDetails>();
-
-            for (int trainidx = 0; trainidx < trains.Count(); trainidx++)
-            {
-                List<InterpolatedTrain> interpolatedTrainList = new List<InterpolatedTrain>();
-            
-                journey = trains[trainidx].TrainJourney;
                 
-                int journeyIdx = 0;
-                //timeChange = false;
-
-                if (journey[journeyIdx].trainDirection == direction.increasing)
-                {
-                    currentKm = startKm;
-                    currentTrainKm = journey[journeyIdx].geometryKm;
-
-                    while (currentKm < endKm)
-                    {
-
-                        if (journeyIdx > 0 && journeyIdx < journey.Count())   // maybe count-1
-                        {
-                            X0 = journey[journeyIdx - 1].geometryKm;
-                            X1 = journey[journeyIdx].geometryKm;
-                            Y0 = journey[journeyIdx - 1].speed;
-                            Y1 = journey[journeyIdx].speed;
-                            if (timeChange)
-                            {
-                                time = journey[journeyIdx - 1].NotificationDateTime;
-                                timeChange = false;
-                            }
-                        }
-                        else
-                        {
-                            X0 = currentKm;
-                            X1 = X0;
-                            Y0 = 0.0;
-                            Y1 = Y0;
-                            time = new DateTime();
-                        }
-
-                        if (currentKm <= X0) // <=
-                            interpolatedSpeed = 0;
-                        else// if (currentKm > Y0)
-                            interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
-                        //else
-                        //   interpolatedSpeed = 0; // linear(currentKm, X0, X1, Y0, Y1);
-
-                        previousKm = currentKm;
-                        currentKm = currentKm + interval / 1000;
-
-                        //calculateTimeInterval(previousKm, currentKm, interpolatedSpeed);
-                        if (interpolatedSpeed > 0)
-                            time = time.AddHours(calculateTimeInterval(previousKm, currentKm, interpolatedSpeed));
-
-                        InterpolatedTrain item = new InterpolatedTrain(trains[trainidx].TrainJourney[0].TrainID, trains[trainidx].TrainJourney[0].LocoID, 
-                                                                        time, previousKm, interpolatedSpeed);
-                        interpolatedTrainList.Add(item);
-
-
-                        if (journeyIdx < journey.Count)
-                            if (currentKm >= journey[journeyIdx].geometryKm)
-                            {
-                                journeyIdx++;
-                                timeChange = true;
-                            }
-
-                    }
-                    //interval = 50;
-
-                }
-                else if (journey[journeyIdx].trainDirection == direction.decreasing)
-                {
-                    currentKm = endKm;
-                    currentTrainKm = journey[journeyIdx].geometryKm;
-
-                    while (currentKm > startKm)
-                    {
-                        if (currentKm < 14.1)
-                            interval = 50;
-
-
-                        if (journeyIdx > 0 && journeyIdx < journey.Count())   // maybe count-1
-                        {
-                            X0 = journey[journeyIdx - 1].geometryKm;
-                            X1 = journey[journeyIdx].geometryKm;
-                            Y0 = journey[journeyIdx - 1].speed;
-                            Y1 = journey[journeyIdx].speed;
-                            if (timeChange)
-                            {
-                                time = journey[journeyIdx - 1].NotificationDateTime;
-                                timeChange = false;
-                            }
-                        }
-                        else
-                        {
-                            X0 = currentKm;
-                            X1 = X0;
-                            Y0 = 0.0;
-                            Y1 = Y0;
-                            time = new DateTime();
-                        }
-
-                        if (currentKm < X0) 
-                            interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
-                        else //if (currentKm >= Y0)
-                            interpolatedSpeed = 0;
-                        //else
-                        //    interpolatedSpeed = 0; // linear(currentKm, X0, X1, Y0, Y1);
-
-                        previousKm = currentKm;
-                        currentKm = currentKm - interval / 1000;
-
-                        if (interpolatedSpeed > 0)
-                            time = time.AddHours(calculateTimeInterval(previousKm, currentKm, interpolatedSpeed));
-
-                        InterpolatedTrain item = new InterpolatedTrain(trains[trainidx].TrainJourney[0].TrainID, trains[trainidx].TrainJourney[0].LocoID,
-                                                                        time, previousKm, interpolatedSpeed);
-                        interpolatedTrainList.Add(item);
-
-                        if (journeyIdx < journey.Count)
-                            if (currentKm <= journey[journeyIdx].geometryKm)
-                            {
-                                journeyIdx++;
-                                timeChange = true;
-                            }
-
-
-                    }
-
-                    //interval = 50;
-
-                }
-                else 
-                { 
-                    /* direction is not defined. There is an error. */                
-                }
-
-
-                Train trainItem = new Train(interpolatedTrainList, journey[0].trainDirection, true);
-                newTrainList.Add(trainItem);
-                
-
-
-            }
-
-            return newTrainList;
-        }
-
-        public void interpolateIncreasingTrainData(List<Train> trains)
-        {
-
-            /* Consider making this an input parameter */
-            double interval = 50.0;     // metres
-            double startKm = 5;
-            double endKm = 70;
-
-            //double gradient = 0;
-            //double intercept = 0;
-            double interpolatedSpeed = 0;
-            double X0, X1, Y0, Y1;
-
-            /* New train list */
-            List<Train> newTrainList = new List<Train>();
-            List<TrainDetails> journey = new List<TrainDetails>();
-
-            for (int trainidx = 0; trainidx < trains.Count(); trainidx++)
-            {
-                journey = trains[trainidx].TrainJourney;
-                int journeyIdx = 0;
-                double currentKm = startKm;
-                double currentTrainKm = journey[journeyIdx].geometryKm;
-
-                while (currentKm < endKm)
-                {
-                    X0 = journey[journeyIdx].speed;
-                    X1 = journey[journeyIdx + 1].speed;
-                    Y0 = journey[journeyIdx].geometryKm;
-                    Y1 = journey[journeyIdx + 1].geometryKm;
-
-                    interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
-
-                    currentKm = currentKm + interval / 1000;
-
-                    if (currentKm >= Y1)
-                        journeyIdx++;
-
-
-                }
-
-
-            }
-
-
-        }
-
-        public void interpolateDecreasingTrainData(List<Train> trains)
-        {
-
-            /* Consider making this an input parameter */
-            double interval = 50.0;     // metres
-            double startKm = 70;
-            double endKm = 5;
-
-            //double gradient = 0;
-            //double intercept = 0;
-            double interpolatedSpeed = 0;
-            double X0, X1, Y0, Y1;
-
-            /* New train list */
-            List<Train> newTrainList = new List<Train>();
-            List<TrainDetails> journey = new List<TrainDetails>();
-
-            for (int trainidx = 0; trainidx < trains.Count(); trainidx++)
-            {
-                journey = trains[trainidx].TrainJourney;
-                int journeyIdx = 0;
-                double currentKm = startKm;
-                double currentTrainKm = journey[journeyIdx].geometryKm;
-
-                while (currentKm > endKm)
-                {
-                    X0 = journey[journeyIdx].speed;
-                    X1 = journey[journeyIdx + 1].speed;
-                    Y0 = journey[journeyIdx].geometryKm;
-                    Y1 = journey[journeyIdx + 1].geometryKm;
-
-                    interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
-
-                    currentKm = currentKm - interval / 1000;
-
-                    if (currentKm >= Y1)
-                        journeyIdx++;
-
-
-                }
-
-
-            }
-
-
-        }
-
+        /// <summary>
+        /// Linear interpolation to a target point.
+        /// </summary>
+        /// <param name="targetX">Target invariant location to be interpolated to.</param>
+        /// <param name="X0">Lower invariant position to interpolate between.</param>
+        /// <param name="X1">Upper invariant position to interpolate between.</param>
+        /// <param name="Y0">Lower variant to interpolate between.</param>
+        /// <param name="Y1">Upper variant to interpolate between.</param>
+        /// <returns>The interpolate variant value at the target invariant location.</returns>
         private double linear(double targetX, double X0, double X1, double Y0, double Y1)
         {
+            /* Take the average when the invariant location does not change. */
             if ((X1 - X0) == 0)
                 return (Y0 + Y1) / 2;
 
             return Y0 + (targetX - X0) * (Y1 - Y0) / (X1 - X0);
         
         }
+
+        /// <summary>
+        ///  Interpolate the train speed to s specified interval using a linear interpolation.
+        /// </summary>
+        /// <param name="trains">List of train objects containing the parameters for each train journey.</param>
+        /// <param name="startKm">Starting kilometreage for the interpolation.</param>
+        /// <param name="endKm">End kilometerage for the interpolation.</param>
+        /// <param name="interval">interpolation interval, specified in metres.</param>
+        /// <returns>List of train objects with interpolated values at the specified interval.</returns>
+        public List<Train> interpolateTrainData(List<Train> trains, double startKm, double endKm, double interval)
+        {
+            /* Placeholders for the interpolated distance markers. */
+            double previousKm = 0;
+            double currentKm = 0;
+            /* Place holder to calaculte the time for each interpolated value. */
+            DateTime time = new DateTime();
+            /* Flag to indicate when to collect the next time value. */
+            bool timeChange = true;
+
+            /* Index values for the interpolation parameters */
+            int index0 = -1;
+            int index1 = -1;
+
+            /* Interplation parameters. */
+            double interpolatedSpeed = 0;
+            double X0, X1, Y0, Y1;
+
+
+            /* Create a new list of trains for the journies interpolated values. */
+            List<Train> newTrainList = new List<Train>();
+            /* Create a journey list to store the existing journey details. */
+            List<TrainDetails> journey = new List<TrainDetails>();
+
+            /* Cycle through each train to interpolate between points. */
+            for (int trainidx = 0; trainidx < trains.Count(); trainidx++)
+            {
+                /* Create a new journey list of interpolated values. */
+                List<InterpolatedTrain> interpolatedTrainList = new List<InterpolatedTrain>();
+
+                journey = trains[trainidx].TrainJourney;
+
+                if (journey[0].trainDirection == direction.increasing)
+                {
+                    /* Set the start of the interpolation. */
+                    currentKm = startKm;
+
+                    while (currentKm < endKm)
+                    {
+                        /* Find the closest kilometerage markers either side of the current interpoaltion point. */
+                        index0 = findClosestLowerKm(currentKm, journey);
+                        index1 = findClosestGreaterKm(currentKm, journey);
+
+                        /* If a valid index is found, extract the existing journey parameters and interpolate. */
+                        if (index0 >= 0 && index1 >= 0)
+                        {
+                            X0 = journey[index0].geometryKm;
+                            X1 = journey[index1].geometryKm;
+                            Y0 = journey[index0].speed;
+                            Y1 = journey[index1].speed;
+                            if (timeChange)
+                            {
+                                time = journey[index0].NotificationDateTime;
+                                timeChange = false;
+                            }
+
+                            /* Perform linear interpolation. */
+                            interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
+                            /* Interpolate the time. */
+                            time = time.AddHours(calculateTimeInterval(previousKm, currentKm, interpolatedSpeed));
+
+                        }
+                        else
+                        {
+                            /* Boundary conditions for interpolating the data prior to and beyond the existing journey points. */
+                            time = new DateTime(2000, 1, 1);
+                            interpolatedSpeed = 0;
+
+                        }
+
+                        /* Determine if we need to extract the time from the data or interpolate it. */
+                        if (index1 >= 0)
+                            if (currentKm >= journey[index1].geometryKm)
+                                timeChange = true;
+
+                        /* Create the interpolated data object and add it to the list. */
+                        InterpolatedTrain item = new InterpolatedTrain(trains[trainidx].TrainJourney[0].TrainID, trains[trainidx].TrainJourney[0].LocoID,
+                                                                        time, currentKm, interpolatedSpeed);
+                        interpolatedTrainList.Add(item);
+
+                        /* Create a copy of the current km marker and increment. */
+                        previousKm = currentKm;
+                        currentKm = currentKm + interval / 1000;
+
+                    }
+
+                }
+                else if (journey[0].trainDirection == direction.decreasing)
+                {
+                    /* Set the start of the interpolation. */
+                    currentKm = endKm;
+
+                    while (currentKm > startKm)
+                    {
+                        /* Find the closest kilometerage markers either side of the current interpoaltion point. */
+                        index0 = findClosestLowerKm(currentKm, journey);
+                        index1 = findClosestGreaterKm(currentKm, journey);
+
+                        /* If a valid index is found, extract the existing journey parameters and interpolate. */
+                        if (index0 >= 0 && index1 >= 0)
+                        {
+                            X0 = journey[index0].geometryKm;
+                            X1 = journey[index1].geometryKm;
+                            Y0 = journey[index0].speed;
+                            Y1 = journey[index1].speed;
+                            if (timeChange)
+                            {
+                                time = journey[index0].NotificationDateTime;
+                                timeChange = false;
+                            }
+
+                            /* Perform linear interpolation. */
+                            interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
+                            /* Interpolate the time. */
+                            time = time.AddHours(calculateTimeInterval(previousKm, currentKm, interpolatedSpeed));
+
+                        }
+                        else
+                        {
+                            /* Boundary conditions for interpolating the data prior to and beyond the existing journey points. */
+                            time = new DateTime(2000, 1, 1);
+                            interpolatedSpeed = 0;
+                        }
+
+                        /* Determine if we need to extract the time from the data or interpolate it. */
+                        if (index0 >= 0)
+                            if (currentKm <= journey[index0].geometryKm)
+                                timeChange = true;
+
+
+                        /* Create the interpolated data object and add it to the list. */
+                        InterpolatedTrain item = new InterpolatedTrain(trains[trainidx].TrainJourney[0].TrainID, trains[trainidx].TrainJourney[0].LocoID,
+                                                                        time, currentKm, interpolatedSpeed);
+                        interpolatedTrainList.Add(item);
+
+                        /* Create a copy of the current km marker and increment. */
+                        previousKm = currentKm;
+                        currentKm = currentKm - interval / 1000;
+
+                    }
+
+                }
+                else
+                {
+                    /* The train direction is not defined. */
+                }
+
+                /* Add the interpolated list to the list of new train objects. */
+                Train trainItem = new Train(interpolatedTrainList, journey[0].trainDirection, true);
+                newTrainList.Add(trainItem);
+
+            }
+
+            /* Return the completed interpolated train data. */
+            return newTrainList;
+        }
         
+        /// <summary>
+        /// Calculate the time interval between two locations based on the speed.
+        /// </summary>
+        /// <param name="startPositon">Starting kilometreage.</param>
+        /// <param name="endPosition">Final kilometreage.</param>
+        /// <param name="speed">Average speed between locations.</param>
+        /// <returns>The time taken to traverse the distance in hours.</returns>
         private double calculateTimeInterval(double startPositon, double endPosition, double speed)
         {
             return Math.Abs(endPosition - startPositon) / speed;    // hours.
-
         }
+
+        /// <summary>
+        /// Find the index of the closest kilometerage that is less than the target point.
+        /// </summary>
+        /// <param name="target">The target kilometerage.</param>
+        /// <param name="journey">The list of train details containig the journey parameters.</param>
+        /// <returns>The index of the closest point that is less than the target point. 
+        /// Returns -1 if a point does not exist.</returns>
+        private int findClosestLowerKm(double target, List<TrainDetails> journey)
+        {
+            /* set the initial values. */
+            double minimum = double.MaxValue;
+            double difference = double.MaxValue;
+            int index = 0;
+
+            /* Cycle through the journey parameters. */
+            for (int i = 0; i < journey.Count(); i++)
+            {
+                /* Find the difference if the value is lower. */
+                if (journey[i].geometryKm < target)
+                    difference = Math.Abs(journey[i].geometryKm - target);
+
+                /* Find the minimum difference. */
+                if (difference < minimum)
+                {
+                    minimum = difference;
+                    index = i;
+                }
+
+            }
+
+            if (difference == double.MaxValue)
+                return -1;
+            
+            return index;
+        }
+
+        /// <summary>
+        /// Find the index of the closest kilometerage that is larger than the target point.
+        /// </summary>
+        /// <param name="target">The target kilometerage.</param>
+        /// <param name="journey">The list of train details containig the journey parameters.</param>
+        /// <returns>The index of the closest point that is larger than the target point. 
+        /// Returns -1 if a point does not exist.</returns>
+        private int findClosestGreaterKm(double target, List<TrainDetails> journey)
+        {
+            /* set the initial values. */
+            double minimum = double.MaxValue;
+            double difference = double.MaxValue;
+            int index = 0;
+
+            /* Cycle through the journey parameters. */
+            for (int i = 0; i < journey.Count(); i++)
+            {
+                /* Find the difference if the value is lower. */
+                if (journey[i].geometryKm > target)
+                    difference = Math.Abs(journey[i].geometryKm - target);
+
+                /* Find the minimum difference. */
+                if (difference < minimum)
+                {
+                    minimum = difference;
+                    index = i;
+                }
+
+            }
+
+            if (difference == double.MaxValue)
+                return -1;
+
+            return index;
+        }
+
 
     }
 }

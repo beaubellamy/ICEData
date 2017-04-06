@@ -114,25 +114,31 @@ namespace ICEData
             this.include = include;
         }
 
-        public Train(List<InterpolatedTrain> trainDetails,  direction trainDirection, bool include)
+        /// <summary>
+        /// Train Object constructor converting an list of interpolatedTrain objects into a list of trainDetail objects.
+        /// </summary>
+        /// <param name="trainDetails">A list of interpolatedTrain objects.</param>
+        /// <param name="trainDirection">The direction of kilometreage of the train.</param>
+        public Train(List<InterpolatedTrain> trainDetails,  direction trainDirection)
         {
 
             List<TrainDetails> journey = new List<TrainDetails>();
 
             for (int i = 0; i < trainDetails.Count(); i++)
             {
+                /* Convert each interpolatedTrain object to a trainDetail object. */
                 TrainDetails newitem = new TrainDetails(trainDetails[i].TrainID, trainDetails[i].LocoID, trainDetails[i].NotificationDateTime, 0, 0, 
                                                         trainDetails[i].speed, 0, trainDetails[i].geometryKm, trainDirection);
                 journey.Add(newitem);
 
             }
             this.TrainJourney = journey;
-            this.include = include;
+            this.include = true;
         }
  
     }
 
-
+    /* A class to hold the interpolated train details. */
     public class InterpolatedTrain
     {
         public string TrainID;
@@ -141,6 +147,9 @@ namespace ICEData
         public double speed;
         public double geometryKm;
 
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
         public InterpolatedTrain()
         { 
             this.TrainID = null;
@@ -150,6 +159,14 @@ namespace ICEData
             this.geometryKm = 0;
         }
 
+        /// <summary>
+        /// InterpolatedTrain object constructor.
+        /// </summary>
+        /// <param name="TrainID">The train ID.</param>
+        /// <param name="locoID">The Loco ID</param>
+        /// <param name="NotificationDateTime">The intiial notification time for the start of the data.</param>
+        /// <param name="geometryKm">The calculated actual kilometerage of the train.</param>
+        /// <param name="speed">The speed (kph) at each location.</param>
         public InterpolatedTrain(string TrainID, string locoID, DateTime NotificationDateTime, double geometryKm, double speed)
         {
             this.TrainID = TrainID;
@@ -159,6 +176,10 @@ namespace ICEData
             this.speed = speed;
         }
 
+        /// <summary>
+        /// InterpolatedTrain object constructor to convert a trainDetails object into an interpolatedTrain object.
+        /// </summary>
+        /// <param name="details">The trainDetails object containing the train journey parameters.</param>
         public InterpolatedTrain(TrainDetails details)
         {
             this.TrainID = details.TrainID;
@@ -229,12 +250,16 @@ namespace ICEData
         {
             /* Artificial input parameters. */
             /* These parameters will be passed into the program. */
+            DateTime[] dateRange = new DateTime[2] { new DateTime(2016, 1, 1), new DateTime(2016, 2, 1) };
+            bool includeAListOfTrainsToExclude = false;
+            double interval = 50;
+            /* Corridor dependant parameters. */
+            double startKm = 5;
+            double endKm = 70;
+            double minimumJourneyDistance = 40000;
             double[] latitude = new double[2] { -33.0, -35.0 };
             double[] longitude = new double[2] { 150.0, 152.0 };
-            DateTime[] dateRange = new DateTime[2] { new DateTime(2016, 1, 1), new DateTime(2016, 2, 1) };
-            double minimumJourneyDistance = 40000;        // meteres, this will vary depending on the corridor under analysis.
-            bool includeAListOfTrainsToExclude = false;
-
+            
             /* Ensure there is a empty list of trains to exclude to start. */
             List<string> excludeTrainList = new List<string> { };
 
@@ -244,8 +269,11 @@ namespace ICEData
             string trainList = null;
 
             /* Select the data file and the trainList file. */
-            filename = tool.browseFile("Select the data file.");
-            geometryFile = tool.browseFile("Select the geometry file.");
+            filename = @"S:\Corporate Strategy\Infrastructure Strategies\Simulations\Train Performance Analysis\Macarthur to Botany\raw data - sample.csv"; 
+            //tool.browseFile("Select the data file.");
+            geometryFile = @"S:\Corporate Strategy\Infrastructure Strategies\Simulations\Train Performance Analysis\Macarthur to Botany\Macarthur to Botany Geometry.csv"; 
+            //tool.browseFile("Select the geometry file.");
+
             if (includeAListOfTrainsToExclude)
             {
                 trainList = tool.browseFile("Select the train list file.");
@@ -274,7 +302,7 @@ namespace ICEData
             /* interpolate data */
             /****** Only required while we dont have the data in the preferred format *****/
             List<Train> interpolatedRecords = new List<Train>();
-            interpolatedRecords = tool.interpolateTrainData(CleanTrainRecords);
+            interpolatedRecords = tool.interpolateTrainData(CleanTrainRecords, startKm, endKm, interval);
             List<InterpolatedTrain> unpackedInterpolation = new List<InterpolatedTrain>();
             unpackedInterpolation = unpackInterpolatedData(interpolatedRecords);
             writeTrainData(unpackedInterpolation);
@@ -416,9 +444,9 @@ namespace ICEData
         }
 
         /// <summary>
-        /// Write the train records to an excel file.
+        /// Write the train records to an excel file for inspection.
         /// </summary>
-        /// <param name="trainRecords">The list of train details object containing all the train records.</param>
+        /// <param name="trainRecords">The list of trainDetails object containing all the train records.</param>
         public static void writeTrainData(List<TrainDetails> trainRecords)
         {
 
@@ -533,6 +561,10 @@ namespace ICEData
             return;
         }
 
+        /// <summary>
+        /// Write the train records to an excel file for inspection.
+        /// </summary>
+        /// <param name="trainRecords">The list of interpolatedTrain object containing all the train records.</param>
         public static void writeTrainData(List<InterpolatedTrain> trainRecords)
         {
 
@@ -547,12 +579,6 @@ namespace ICEData
             /* Get the reference to the new workbook. */
             workbook = (Microsoft.Office.Interop.Excel._Workbook)(excel.Workbooks.Add(""));
             
-            /*public string TrainID;
-        public string LocoID;
-        public DateTime NotificationDateTime;
-        public double speed;
-        public double geometryKm;*/
-
             /* Create the header details. */
             string[] headerString = { "Train ID", "loco ID", " Notification Date Time", "Actual Km",  "Speed" };
 
@@ -748,7 +774,7 @@ namespace ICEData
         /// <summary>
         /// Unpack the Train data structure into a single list of TrainDetails objects.
         /// </summary>
-        /// <param name="OrderdTrainRecords">The Train object containing a list of trains with there journey details.</param>
+        /// <param name="OrderdTrainRecords">The Train object containing a list of trains with their journey details.</param>
         /// <returns>A single list of TrainDetail objects.</returns>
         public static List<TrainDetails> unpackCleanData(List<Train> OrderdTrainRecords)
         {
@@ -768,7 +794,11 @@ namespace ICEData
             return unpackedData;
         }
 
-
+        /// <summary>
+        /// Unpack the Train data structure into a single list of interpolatedTrain objects.
+        /// </summary>
+        /// <param name="OrderdTrainRecords">The Train object containing a list of trains with their journey details.</param>
+        /// <returns>A single list of interpolatedTrain objects.</returns>
         public static List<InterpolatedTrain> unpackInterpolatedData(List<Train> OrderdTrainRecords)
         {
             /* Place holder to store all train records in one list. */
