@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 
 namespace ICEData
 {
+    
+
     class trackGeometry
     {
         int corridorNumber;
@@ -15,8 +17,13 @@ namespace ICEData
         double kilometreage;
         double virtualKilometreage;
         bool isLoopHere;
+        //double temporarySpeedRestriction;
+        //bool isTSRHere;
 
+        /* Create a tools Class. */
         Tools tool = new Tools();
+        /* Create a processing Class. */
+        processing processing = new processing();
 
         /* Constructors */
 
@@ -33,6 +40,8 @@ namespace ICEData
             this.kilometreage = 0;
             this.virtualKilometreage = 0;
             this.isLoopHere = false;
+            //double temporarySpeedRestriction = 0;
+            //bool isTSRHere = false;
         }
 
         /// <summary>
@@ -56,6 +65,8 @@ namespace ICEData
             this.kilometreage = kilometreage;
             this.virtualKilometreage = virtualKilometreage;
             this.isLoopHere = loop;
+            //double temporarySpeedRestriction = 0;
+            //bool isTSRHere = false;
         }
 
         /// <summary>
@@ -143,7 +154,7 @@ namespace ICEData
                         }
 
                         /* Calcualte the distance between succesive points and increment the virtual kilometreage. */
-                        distance = tool.calculateDistance(previousLat, previousLong, latitude, longitude);
+                        distance = processing.calculateDistance(previousLat, previousLong, latitude, longitude);
                         if (direction == direction.increasing)
                             virtualKilometreage = virtualKilometreage + distance/1000;
                         
@@ -187,7 +198,7 @@ namespace ICEData
                 /* Set the current track geometry point. */
                 trackPoint = trackGeometry[trackIdx].point;
                 /* Calcualte the distance between the current track point and the location supplied. */
-                distance = tool.calculateDistance(trackPoint.latitude, trackPoint.longitude, Latitude, Longitude);
+                distance = processing.calculateDistance(trackPoint.latitude, trackPoint.longitude, Latitude, Longitude);
 
                 /* Determine when the minimum distance is reached. */
                 if (distance < minimumDistance)
@@ -222,7 +233,7 @@ namespace ICEData
                 /* Set the current track geometry point. */
                 trackPoint = trackGeometry[trackIdx].point;
                 /* Calcualte the distance between the current track point and the location supplied. */
-                distance = tool.calculateDistance(trackPoint, Location);
+                distance = processing.calculateDistance(trackPoint, Location);
                 
                 /* Determine when the minimum distance is reached. */
                 if (distance < minimumDistance)
@@ -238,7 +249,7 @@ namespace ICEData
         }
 
 
-    }
-
+    } // Class trackGeometry
     
-}
+} // namespace
+

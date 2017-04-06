@@ -21,6 +21,7 @@ namespace ICEData
            
         public string TrainID;
         public string LocoID;
+        public double powerToWeight;    // *************************************
         public DateTime NotificationDateTime;
         public double latitude;
         public double longitude;
@@ -37,6 +38,7 @@ namespace ICEData
         {
             this.TrainID = "none";
             this.LocoID = "none";
+            this.powerToWeight = 1;
             this.NotificationDateTime = new DateTime(2000, 1, 1, 0, 0, 0);
             this.latitude = -33.8519;   //Sydney Harbour Bridge
             this.longitude = 151.2108;
@@ -63,6 +65,7 @@ namespace ICEData
         {
             this.TrainID = TrainID;
             this.LocoID = locoID;
+            this.powerToWeight = 1; // ************************************
             this.NotificationDateTime = NotificationDateTime;
             this.latitude = latitude;
             this.longitude = longitude;
@@ -124,11 +127,11 @@ namespace ICEData
 
             List<TrainDetails> journey = new List<TrainDetails>();
 
-            for (int i = 0; i < trainDetails.Count(); i++)
+            for (int journeyIdx = 0; journeyIdx < trainDetails.Count(); journeyIdx++)
             {
                 /* Convert each interpolatedTrain object to a trainDetail object. */
-                TrainDetails newitem = new TrainDetails(trainDetails[i].TrainID, trainDetails[i].LocoID, trainDetails[i].NotificationDateTime, 0, 0, 
-                                                        trainDetails[i].speed, 0, trainDetails[i].geometryKm, trainDirection);
+                TrainDetails newitem = new TrainDetails(trainDetails[journeyIdx].TrainID, trainDetails[journeyIdx].LocoID, trainDetails[journeyIdx].NotificationDateTime, 0, 0, 
+                                                        trainDetails[journeyIdx].speed, 0, trainDetails[journeyIdx].geometryKm, trainDirection);
                 journey.Add(newitem);
 
             }
@@ -143,6 +146,7 @@ namespace ICEData
     {
         public string TrainID;
         public string LocoID;
+        public double powerToWeight;    // ********************************************
         public DateTime NotificationDateTime;
         public double speed;
         public double geometryKm;
@@ -154,6 +158,7 @@ namespace ICEData
         { 
             this.TrainID = null;
             this.LocoID = null;
+            this.powerToWeight = 1;
             this.NotificationDateTime = new DateTime(2000, 1, 1, 0, 0, 0);
             this.speed = 0;
             this.geometryKm = 0;
@@ -171,6 +176,7 @@ namespace ICEData
         {
             this.TrainID = TrainID;
             this.LocoID = locoID;
+            this.powerToWeight = 1;
             this.NotificationDateTime = NotificationDateTime;
             this.geometryKm = geometryKm;
             this.speed = speed;
@@ -184,6 +190,7 @@ namespace ICEData
         {
             this.TrainID = details.TrainID;
             this.LocoID = details.LocoID;
+            this.powerToWeight = details.powerToWeight;
             this.NotificationDateTime = details.NotificationDateTime;
             this.geometryKm = details.geometryKm;
             this.speed = details.speed;
@@ -198,8 +205,7 @@ namespace ICEData
         /* Latitude and longitude of the location */
         public double latitude;
         public double longitude;
-
-
+        
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -239,9 +245,11 @@ namespace ICEData
     class ICEData
     {
 
-        /* Create a tools object. */
+        /* Create a tools Class. */
         public static Tools tool = new Tools();
-        /* Create a trackGeometry object. */
+        /* Create a processing Class. */
+        public static processing processing = new processing();
+        /* Create a trackGeometry Class. */
         public static trackGeometry track = new trackGeometry();
 
 
@@ -296,13 +304,14 @@ namespace ICEData
             OrderdTrainRecords = TrainRecords.OrderBy(t => t.TrainID).ThenBy(t => t.LocoID).ThenBy(t => t.NotificationDateTime).ThenBy(t => t.kmPost).ToList();
 
             /* Clean data - remove trains with insufficient data. */
+            /******** Should only be required while we are waiting for the data in the prefered format ********/
             List<Train> CleanTrainRecords = new List<Train>();
             CleanTrainRecords = CleanData(trackGeometry, OrderdTrainRecords, minimumJourneyDistance);
 
             /* interpolate data */
-            /****** Only required while we dont have the data in the preferred format *****/
+            /******** Should only be required while we are waiting for the data in the prefered format ********/
             List<Train> interpolatedRecords = new List<Train>();
-            interpolatedRecords = tool.interpolateTrainData(CleanTrainRecords, startKm, endKm, interval);
+            interpolatedRecords = processing.interpolateTrainData(CleanTrainRecords, startKm, endKm, interval);
             List<InterpolatedTrain> unpackedInterpolation = new List<InterpolatedTrain>();
             unpackedInterpolation = unpackInterpolatedData(interpolatedRecords);
             writeTrainData(unpackedInterpolation);
@@ -710,7 +719,7 @@ namespace ICEData
                     point1 = new GeoLocation(OrderdTrainRecords[trainIndex - 1]);
                     point2 = new GeoLocation(OrderdTrainRecords[trainIndex]);
 
-                    distance = tool.calculateDistance(point1, point2);
+                    distance = processing.calculateDistance(point1, point2);
                     journeyDistance = journeyDistance + distance;
                     
                     if (distance > distanceThreshold)
@@ -785,10 +794,10 @@ namespace ICEData
             foreach (Train train in OrderdTrainRecords)
             {
                 /* Cycle through each record in the train journey. */
-                for (int i = 0; i < train.TrainJourney.Count(); i++)
+                for (int journeyIdx = 0; journeyIdx < train.TrainJourney.Count(); journeyIdx++)
                 {
                     /* Add it to the list. */
-                    unpackedData.Add(train.TrainJourney[i]);
+                    unpackedData.Add(train.TrainJourney[journeyIdx]);
                 }
             }
             return unpackedData;
@@ -808,13 +817,17 @@ namespace ICEData
             foreach (Train train in OrderdTrainRecords)
             {
                 /* Cycle through each record in the train journey. */
-                for (int i = 0; i < train.TrainJourney.Count(); i++)
+                for (int journeyIdx = 0; journeyIdx < train.TrainJourney.Count(); journeyIdx++)
                 {
                     /* Add it to the list. */
-                    unpackedData.Add(new InterpolatedTrain(train.TrainJourney[i]));
+                    unpackedData.Add(new InterpolatedTrain(train.TrainJourney[journeyIdx]));
                 }
             }
             return unpackedData;
         }
-    }
-}
+    
+
+    } // Class ICEData
+    
+} // namespace
+
