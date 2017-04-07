@@ -10,15 +10,15 @@ namespace ICEData
 
     class trackGeometry
     {
-        int corridorNumber;
-        string corridorName;
-        GeoLocation point = new GeoLocation();
-        double elevation;
-        double kilometreage;
-        double virtualKilometreage;
-        bool isLoopHere;
-        //double temporarySpeedRestriction;
-        //bool isTSRHere;
+        public int corridorNumber;
+        public string corridorName;
+        public GeoLocation point = new GeoLocation();
+        public double elevation;
+        public double kilometreage;
+        public double virtualKilometreage;
+        public bool isLoopHere;
+        public double temporarySpeedRestriction;
+        public bool isTSRHere;
 
         /* Create a tools Class. */
         Tools tool = new Tools();
@@ -40,9 +40,10 @@ namespace ICEData
             this.kilometreage = 0;
             this.virtualKilometreage = 0;
             this.isLoopHere = false;
-            //double temporarySpeedRestriction = 0;
-            //bool isTSRHere = false;
+            this.temporarySpeedRestriction = 0;
+            this.isTSRHere = false;
         }
+
 
         /// <summary>
         /// Track Geometry Constructor
@@ -65,8 +66,9 @@ namespace ICEData
             this.kilometreage = kilometreage;
             this.virtualKilometreage = virtualKilometreage;
             this.isLoopHere = loop;
-            //double temporarySpeedRestriction = 0;
-            //bool isTSRHere = false;
+            /**********************************/
+            this.temporarySpeedRestriction = 0;
+            this.isTSRHere = false;
         }
 
         /// <summary>
@@ -88,7 +90,7 @@ namespace ICEData
             /* Seperate the fields. */
             string[] fields = lines[0].Split(delimeters);
 
-            int firstPoint = 0;
+            bool firstPoint = true;
 
             /* Define the track geomerty parameters. */
             string geometryName = null;
@@ -131,26 +133,24 @@ namespace ICEData
                         isLoopHere = false;
 
                     /* The virtual kilometreage starts at the first kilometreage of the track. */
-                    if (firstPoint == 0)
+                    if (firstPoint)
                     {
                         virtualKilometreage = kilometreage;
                         /* Set the 'pervious' parameters. */
                         previousLat = latitude;
                         previousLong = longitude;
                         previouskm = kilometreage;
-                        firstPoint++;
+                        firstPoint = false;
                     }
                     else
                     {
                         /* Determine the direction the track kilometreage. */
-                        if (firstPoint == 1)
+                        if (direction == direction.notSpecified)
                         {
                             if (kilometreage - previouskm > 0)
                                 direction = direction.increasing;
                             else
                                 direction = direction.decreasing;
-
-                            firstPoint++;
                         }
 
                         /* Calcualte the distance between succesive points and increment the virtual kilometreage. */
@@ -170,6 +170,7 @@ namespace ICEData
                 /* Add the geometry point to the list. */
                 trackGeometry geometry = new trackGeometry(0, geometryName, latitude, longitude, elevation, kilometreage, virtualKilometreage, isLoopHere);
                 trackGeometry.Add(geometry);
+
                 }
             }
 
@@ -214,7 +215,7 @@ namespace ICEData
         }
 
         /// <summary>
-        /// Function finds the kilometreage point on the track that is closest to the supplied geographic location (latitude, longitude)
+        /// Finds the kilometreage point on the track that is closest to the supplied geographic location (latitude, longitude)
         /// </summary>
         /// <param name="trackGeometry">List of trackGeometry objects.</param>
         /// <param name="Location">Geographic location with latitude and longitude.</param>
@@ -248,8 +249,44 @@ namespace ICEData
             return trackGeometry[minimumIndex].kilometreage;
         }
 
+        /// <summary>
+        /// Finds the kilometreage point on the track that is closest to the supplied kilometerage point.
+        /// </summary>
+        /// <param name="trackGeometry">List of trackGeometry objects.</param>
+        /// <param name="location">Train kilometerage.</param>
+        /// <returns>The index of the closest track kilometreage point to the train kilometreage.</returns>
+        public int findClosestTrackGeometryPoint(List<trackGeometry> trackGeometry, double location)
+        {
+            /* Set up initial values. */
+            int minimumIndex = 0;
+            double minimumDistance = double.MaxValue;
+            double distance = 0;
+            double trackKm = 0;
+
+            for (int trackIdx = 0; trackIdx < trackGeometry.Count(); trackIdx++)
+            {
+                /* Set the current track geometry point. */
+                trackKm = trackGeometry[trackIdx].virtualKilometreage; // .kilometreage;
+                /* Calcualte the distance between the current track point and the location supplied. */
+                distance = Math.Abs(trackKm - location);
+
+                /* Determine when the minimum distance is reached. */
+                if (distance < minimumDistance)
+                {
+                    minimumDistance = distance;
+                    minimumIndex = trackIdx;
+                }
+
+            }
+
+            if (minimumDistance == double.MaxValue)
+                return -1;
+
+            return minimumIndex;
+        }
 
     } // Class trackGeometry
+
     
 } // namespace
 

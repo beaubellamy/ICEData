@@ -29,7 +29,10 @@ namespace ICEData
         public double kmPost;
         public double geometryKm;
         public direction trainDirection;
-
+        /*******************/
+        public bool isLoopHere;
+        public bool isTSRHere;
+        public double TSRspeed;
 
         /// <summary>
         /// Default trainDetails constructor.
@@ -46,6 +49,11 @@ namespace ICEData
             this.kmPost = 0;
             this.geometryKm = 0;
             this.trainDirection = direction.notSpecified;
+            /*******************/
+            this.isLoopHere = false;
+            this.isTSRHere = false;
+            this.TSRspeed = 0;
+
         }
 
         /// <summary>
@@ -61,7 +69,7 @@ namespace ICEData
         /// <param name="geometryKm">The calcualted distance from the km post of the first point.</param>
         /// <param name="trainDirection">The train bearing.</param>
         public TrainDetails(string TrainID, string locoID, DateTime NotificationDateTime, double latitude, double longitude, 
-                            double speed, double kmPost, double geometryKm, direction trainDirection)
+                            double speed, double kmPost, double geometryKm, direction trainDirection, bool loop, bool TSR, double TSRspeed)
         {
             this.TrainID = TrainID;
             this.LocoID = locoID;
@@ -73,6 +81,9 @@ namespace ICEData
             this.kmPost = kmPost;
             this.geometryKm = geometryKm;
             this.trainDirection = trainDirection;
+            this.isLoopHere = loop;
+            this.isTSRHere = TSR;
+            this.TSRspeed = TSRspeed;
 
         }
        
@@ -105,7 +116,6 @@ namespace ICEData
             this.include = true;
         }
 
-
         /// <summary>
         /// Train Object constructor.
         /// </summary>
@@ -131,7 +141,10 @@ namespace ICEData
             {
                 /* Convert each interpolatedTrain object to a trainDetail object. */
                 TrainDetails newitem = new TrainDetails(trainDetails[journeyIdx].TrainID, trainDetails[journeyIdx].LocoID, trainDetails[journeyIdx].NotificationDateTime, 0, 0, 
-                                                        trainDetails[journeyIdx].speed, 0, trainDetails[journeyIdx].geometryKm, trainDirection);
+                                                        trainDetails[journeyIdx].speed, 0, trainDetails[journeyIdx].geometryKm, trainDirection, trainDetails[journeyIdx].isLoopeHere,
+                                                        trainDetails[journeyIdx].isTSRHere, trainDetails[journeyIdx].TSRspeed);
+                
+
                 journey.Add(newitem);
 
             }
@@ -150,6 +163,11 @@ namespace ICEData
         public DateTime NotificationDateTime;
         public double speed;
         public double geometryKm;
+        /**********************/
+        public bool isLoopeHere;
+        public bool isTSRHere;
+        public double TSRspeed;
+
 
         /// <summary>
         /// Default constructor.
@@ -162,6 +180,10 @@ namespace ICEData
             this.NotificationDateTime = new DateTime(2000, 1, 1, 0, 0, 0);
             this.speed = 0;
             this.geometryKm = 0;
+            /************************/
+            this.isLoopeHere = false;
+            this.isTSRHere = false;
+            this.TSRspeed = 0;
         }
 
         /// <summary>
@@ -172,7 +194,7 @@ namespace ICEData
         /// <param name="NotificationDateTime">The intiial notification time for the start of the data.</param>
         /// <param name="geometryKm">The calculated actual kilometerage of the train.</param>
         /// <param name="speed">The speed (kph) at each location.</param>
-        public InterpolatedTrain(string TrainID, string locoID, DateTime NotificationDateTime, double geometryKm, double speed)
+        public InterpolatedTrain(string TrainID, string locoID, DateTime NotificationDateTime, double geometryKm, double speed, bool loop, bool TSR, double TSRspeed)
         {
             this.TrainID = TrainID;
             this.LocoID = locoID;
@@ -180,6 +202,10 @@ namespace ICEData
             this.NotificationDateTime = NotificationDateTime;
             this.geometryKm = geometryKm;
             this.speed = speed;
+            /************************/
+            this.isLoopeHere = loop;
+            this.isTSRHere = TSR;
+            this.TSRspeed = TSRspeed;
         }
 
         /// <summary>
@@ -194,6 +220,10 @@ namespace ICEData
             this.NotificationDateTime = details.NotificationDateTime;
             this.geometryKm = details.geometryKm;
             this.speed = details.speed;
+            /************************/  // need to make sure these values are populated when creating the object.
+            this.isLoopeHere = details.isLoopHere;
+            this.isTSRHere = details.isTSRHere;
+            this.TSRspeed = details.TSRspeed;
         }
     }
 
@@ -311,7 +341,7 @@ namespace ICEData
             /* interpolate data */
             /******** Should only be required while we are waiting for the data in the prefered format ********/
             List<Train> interpolatedRecords = new List<Train>();
-            interpolatedRecords = processing.interpolateTrainData(CleanTrainRecords, startKm, endKm, interval);
+            interpolatedRecords = processing.interpolateTrainData(CleanTrainRecords, trackGeometry, startKm, endKm, interval);
             List<InterpolatedTrain> unpackedInterpolation = new List<InterpolatedTrain>();
             unpackedInterpolation = unpackInterpolatedData(interpolatedRecords);
             writeTrainData(unpackedInterpolation);
@@ -414,7 +444,7 @@ namespace ICEData
                         NotificationDateTime >= dateRange[0] && NotificationDateTime < dateRange[1] &&
                         !includeTrain)
                     {
-                        TrainDetails record = new TrainDetails(TrainID, locoID, NotificationDateTime, latitude, longitude, speed, kmPost, geometryKm, direction.notSpecified);
+                        TrainDetails record = new TrainDetails(TrainID, locoID, NotificationDateTime, latitude, longitude, speed, kmPost, geometryKm, direction.notSpecified,false,false,0);
                         IceRecord.Add(record);
                     }
 
@@ -471,7 +501,8 @@ namespace ICEData
             workbook = (Microsoft.Office.Interop.Excel._Workbook)(excel.Workbooks.Add(""));
 
             /* Create the header details. */
-            string[] headerString = { "Train ID", "loco ID", " Notification Date Time", "Latitude", "Longitude", "Speed", "km Post", "Actual Km", "Train Direction" };
+            string[] headerString = { "Train ID", "loco ID", " Notification Date Time", "Latitude", "Longitude", "Speed", 
+                                        "km Post", "Actual Km", "Train Direction", "Loop", "TSR", "TSR Speed" };
 
             /* Pagenate the data for writing to excel. */
             int excelPageSize = 1000000;        /* Page size of the excel worksheet. */
@@ -495,6 +526,9 @@ namespace ICEData
             double[,] kmPost = new double[excelPageSize, 1];
             double[,] geometryKm = new double[excelPageSize, 1];
             string[,] trainDirection = new string[excelPageSize, 1];
+            string[,] loopLocation = new string[excelPageSize, 1];
+            string[,] TSRLocation = new string[excelPageSize, 1];
+            double[,] TSRspeed = new double[excelPageSize, 1];
 
             
             /* Loop through the excel pages. */
@@ -503,11 +537,16 @@ namespace ICEData
                 /* Set the active worksheet. */
                 worksheet = (Microsoft.Office.Interop.Excel._Worksheet)workbook.Sheets[excelPage + 1];
                 workbook.Sheets[excelPage + 1].Activate();
-                worksheet.get_Range("A1", "I1").Value2 = headerString;
+                worksheet.get_Range("A1", "L1").Value2 = headerString;
 
                 /* Loop through the data for each excel page. */
                 for (int j = 0; j < excelPageSize; j++)
                 {
+                    /* Set the default loop and TSR parameters. */
+                    loopLocation[j, 0] = "";
+                    TSRLocation[j, 0] = "";
+                    TSRspeed[j, 0] = 0;
+
 
                     /* Check we dont try to read more data than there really is. */
                     int checkIdx = j + excelPage * excelPageSize;
@@ -522,6 +561,14 @@ namespace ICEData
                         kmPost[j, 0] = trainRecords[checkIdx].kmPost;
                         geometryKm[j, 0] = trainRecords[checkIdx].geometryKm;
                         trainDirection[j, 0] = trainRecords[checkIdx].trainDirection.ToString();
+                        if (trainRecords[checkIdx].isLoopHere)
+                            loopLocation[j, 0] = "Loop";
+                        if (trainRecords[checkIdx].isTSRHere)
+                        {
+                            TSRLocation[j, 0] = "TSR";
+                            TSRspeed[j, 0] = trainRecords[checkIdx].TSRspeed;
+                        }
+                        
                     }
                     else
                     {
@@ -548,6 +595,10 @@ namespace ICEData
                 worksheet.get_Range("G" + headerOffset, "G" + (headerOffset + excelPageSize - 1)).Value2 = kmPost;
                 worksheet.get_Range("H" + headerOffset, "H" + (headerOffset + excelPageSize - 1)).Value2 = geometryKm;
                 worksheet.get_Range("I" + headerOffset, "I" + (headerOffset + excelPageSize - 1)).Value2 = trainDirection;
+                worksheet.get_Range("J" + headerOffset, "J" + (headerOffset + excelPageSize - 1)).Value2 = loopLocation;
+                worksheet.get_Range("K" + headerOffset, "K" + (headerOffset + excelPageSize - 1)).Value2 = TSRLocation;
+                worksheet.get_Range("L" + headerOffset, "L" + (headerOffset + excelPageSize - 1)).Value2 = TSRspeed;
+
 
             }
 
@@ -589,7 +640,7 @@ namespace ICEData
             workbook = (Microsoft.Office.Interop.Excel._Workbook)(excel.Workbooks.Add(""));
             
             /* Create the header details. */
-            string[] headerString = { "Train ID", "loco ID", " Notification Date Time", "Actual Km",  "Speed" };
+            string[] headerString = { "Train ID", "loco ID", " Notification Date Time", "Actual Km",  "Speed" , "Loop", "TSR", "TSR speed"};
 
             /* Pagenate the data for writing to excel. */
             int excelPageSize = 1000000;        /* Page size of the excel worksheet. */
@@ -609,7 +660,9 @@ namespace ICEData
             DateTime[,] NotificationTime = new DateTime[excelPageSize + 10, 1];
             double[,] speed = new double[excelPageSize, 1];
             double[,] geometryKm = new double[excelPageSize, 1];
-           
+            string[,] loopLocation = new string[excelPageSize, 1];
+            string[,] TSRLocation = new string[excelPageSize, 1];
+            double[,] TSRspeed = new double[excelPageSize, 1];
 
             /* Loop through the excel pages. */
             for (int excelPage = 0; excelPage < excelPages; excelPage++)
@@ -617,11 +670,15 @@ namespace ICEData
                 /* Set the active worksheet. */
                 worksheet = (Microsoft.Office.Interop.Excel._Worksheet)workbook.Sheets[excelPage + 1];
                 workbook.Sheets[excelPage + 1].Activate();
-                worksheet.get_Range("A1", "E1").Value2 = headerString;
-
+                worksheet.get_Range("A1", "H1").Value2 = headerString;
+                
                 /* Loop through the data for each excel page. */
                 for (int j = 0; j < excelPageSize; j++)
                 {
+                    /* Set default loop and TSR parameters. */
+                    loopLocation[j, 0] = "";
+                    TSRLocation[j, 0] = "";
+                    TSRspeed[j, 0] = 0;
 
                     /* Check we dont try to read more data than there really is. */
                     int checkIdx = j + excelPage * excelPageSize;
@@ -632,7 +689,13 @@ namespace ICEData
                         NotificationTime[j, 0] = trainRecords[checkIdx].NotificationDateTime;
                         speed[j, 0] = trainRecords[checkIdx].speed;
                         geometryKm[j, 0] = trainRecords[checkIdx].geometryKm;
-                        
+                        if (trainRecords[checkIdx].isLoopeHere)
+                            loopLocation[j, 0] = "Loop";
+                        if (trainRecords[checkIdx].isTSRHere)
+                        {
+                            TSRLocation[j, 0] = "TSR";
+                            TSRspeed[j, 0] = trainRecords[checkIdx].TSRspeed;
+                        }
                     }
                     else
                     {
@@ -652,6 +715,9 @@ namespace ICEData
                 worksheet.get_Range("C" + headerOffset, "C" + (headerOffset + excelPageSize - 1)).Value2 = NotificationTime;
                 worksheet.get_Range("D" + headerOffset, "D" + (headerOffset + excelPageSize - 1)).Value2 = geometryKm;
                 worksheet.get_Range("E" + headerOffset, "E" + (headerOffset + excelPageSize - 1)).Value2 = speed;
+                worksheet.get_Range("F" + headerOffset, "F" + (headerOffset + excelPageSize - 1)).Value2 = loopLocation;
+                worksheet.get_Range("G" + headerOffset, "G" + (headerOffset + excelPageSize - 1)).Value2 = TSRLocation;
+                worksheet.get_Range("H" + headerOffset, "H" + (headerOffset + excelPageSize - 1)).Value2 = TSRspeed;
                 
             }
 
@@ -743,8 +809,10 @@ namespace ICEData
                         item.TrainJourney = newTrainList.ToList();
 
                         /* Determine direction and actual km. */
-                        tool.populateDirection(item);
-                        tool.populateGeometryKm(item);
+                        processing.populateDirection(item);
+                        processing.populateGeometryKm(item);
+                        processing.populateLoopLocations(item, trackGeometry);
+                        processing.populateTemporarySpeedRestrictions(item, trackGeometry);
 
                         cleanTrainList.Add(item);
 
@@ -767,8 +835,10 @@ namespace ICEData
                     /* If all points are aceptable, add the train journey to the cleaned list. */
                     Train item = new Train();
                     item.TrainJourney = newTrainList.ToList();
-                    tool.populateDirection(item);
-                    tool.populateGeometryKm(item);
+                    processing.populateDirection(item);
+                    processing.populateGeometryKm(item);
+                    processing.populateLoopLocations(item, trackGeometry);
+                    processing.populateTemporarySpeedRestrictions(item, trackGeometry);
 
                     cleanTrainList.Add(item);
 

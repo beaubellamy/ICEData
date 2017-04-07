@@ -167,73 +167,9 @@ namespace ICEData
         }
 
         
-        /// <summary>
-        /// Function determines the direction of the train using the first and last km posts.
-        /// </summary>
-        /// <param name="train">A train object containing kmPost information</param>
-        /// <returns>Enumerated direction of the train km's.</returns>
-        private direction determineTrainDirection(Train train)
-        {
-            /* Determine the distance and sign from the first point to the last point */
-            double journeyDistance = train.TrainJourney[train.TrainJourney.Count - 1].kmPost - train.TrainJourney[0].kmPost;
-            
-            if (journeyDistance > 0)
-                return direction.increasing;
-            else
-                return direction.decreasing;
 
-        }
-        
-        /// <summary>
-        /// Function populates the direction parameter for the train.
-        /// </summary>
-        /// <param name="train">The train object</param>
-        public void populateDirection(Train train)
-        {
-            /* Determine the direction of the train */
-            direction direction = determineTrainDirection(train);
 
-            /* Populate the direction parameter. */
-            foreach (TrainDetails trainPoint in train.TrainJourney)
-            {
-                trainPoint.trainDirection = direction;
-            }
-
-        }
-
-        /// <summary>
-        /// Populate the geometry km information based on the calculated distance from the first km post.
-        /// </summary>
-        /// <param name="train">A train object.</param>
-        public void populateGeometryKm(Train train)
-        {
-            /* Determine the direction of the km's the train is travelling. */
-            direction direction = determineTrainDirection(train);
-            double point2PointDistance = 0;
-
-            /* Thie first km point is populated by the parent function ICEData.CleanData(). */
-            
-            for (int journeyIdx = 1; journeyIdx < train.TrainJourney.Count(); journeyIdx++)
-            {
-                /* Calculate the distance between successive points. */
-                GeoLocation point1 = new GeoLocation(train.TrainJourney[journeyIdx - 1]);
-                GeoLocation point2 = new GeoLocation(train.TrainJourney[journeyIdx]);
-                point2PointDistance = processing.calculateDistance(point1, point2);
-
-                /* Determine the cumulative actual geometry km based on the direction. */
-                if (direction.Equals(direction.increasing))
-                    train.TrainJourney[journeyIdx].geometryKm = train.TrainJourney[journeyIdx - 1].geometryKm + point2PointDistance/1000;
-                
-                else if (direction.Equals(direction.decreasing))
-                    train.TrainJourney[journeyIdx].geometryKm = train.TrainJourney[journeyIdx - 1].geometryKm - point2PointDistance/1000;
-            
-                else
-                    train.TrainJourney[journeyIdx].geometryKm = train.TrainJourney[journeyIdx].kmPost;
-            }
-                       
-        }
-                
-        
+  
         
     }
 }

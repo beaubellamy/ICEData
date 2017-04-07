@@ -11,6 +11,7 @@ namespace ICEData
         // Mean radius of the Earth
         private const double EarthRadius = 6371000.0;   // metres
 
+        //trackGeometry track = new trackGeometry();
         
         /// <summary>
         /// Convert degrees in to radians
@@ -33,9 +34,9 @@ namespace ICEData
         public double calculateDistance(double latitude1, double longitude1, double latitude2, double longitude2)
         {
 
-            double arcsine = Math.Sin(degress2radians(latitude2 - latitude1)) * Math.Sin(degress2radians(latitude2 - latitude1)) +
+            double arcsine = Math.Sin(degress2radians((latitude2 - latitude1)/2)) * Math.Sin(degress2radians((latitude2 - latitude1)/2)) +
                 Math.Cos(degress2radians(latitude1)) * Math.Cos(degress2radians(latitude2)) *
-                Math.Sin(degress2radians(longitude2 - longitude1)) * Math.Sin(degress2radians(longitude2 - longitude1));
+                Math.Sin(degress2radians((longitude2 - longitude1)/2)) * Math.Sin(degress2radians((longitude2 - longitude1)/2));
             double arclength = 2 * Math.Atan2(Math.Sqrt(arcsine), Math.Sqrt(1 - arcsine));
 
             return EarthRadius * arclength;
@@ -60,7 +61,112 @@ namespace ICEData
             return EarthRadius * arclength;
 
         }
+
         
+        /// <summary>
+        /// Function determines the direction of the train using the first and last km posts.
+        /// </summary>
+        /// <param name="train">A train object containing kmPost information</param>
+        /// <returns>Enumerated direction of the train km's.</returns>
+        private direction determineTrainDirection(Train train)
+        {
+            /* Determine the distance and sign from the first point to the last point */
+            double journeyDistance = train.TrainJourney[train.TrainJourney.Count - 1].kmPost - train.TrainJourney[0].kmPost;
+
+            if (journeyDistance > 0)
+                return direction.increasing;
+            else
+                return direction.decreasing;
+
+        }
+
+        /// <summary>
+        /// Function populates the direction parameter for the train.
+        /// </summary>
+        /// <param name="train">The train object</param>
+        public void populateDirection(Train train)
+        {
+            /* Determine the direction of the train */
+            direction direction = determineTrainDirection(train);
+
+            /* Populate the direction parameter. */
+            foreach (TrainDetails trainPoint in train.TrainJourney)
+            {
+                trainPoint.trainDirection = direction;
+            }
+
+        }
+
+        /// <summary>
+        /// Populate the geometry km information based on the calculated distance from the first km post.
+        /// </summary>
+        /// <param name="train">A train object.</param>
+        public void populateGeometryKm(Train train)
+        {
+            /* Determine the direction of the km's the train is travelling. */
+            direction direction = determineTrainDirection(train);
+            double point2PointDistance = 0;
+
+            /* Thie first km point is populated by the parent function ICEData.CleanData(). */
+            for (int journeyIdx = 1; journeyIdx < train.TrainJourney.Count(); journeyIdx++)
+            {
+                /* Calculate the distance between successive points. */
+                GeoLocation point1 = new GeoLocation(train.TrainJourney[journeyIdx - 1]);
+                GeoLocation point2 = new GeoLocation(train.TrainJourney[journeyIdx]);
+                point2PointDistance = calculateDistance(point1, point2);
+
+                /* Determine the cumulative actual geometry km based on the direction. */
+                if (direction.Equals(direction.increasing))
+                    train.TrainJourney[journeyIdx].geometryKm = train.TrainJourney[journeyIdx - 1].geometryKm + point2PointDistance / 1000;
+
+                else if (direction.Equals(direction.decreasing))
+                    train.TrainJourney[journeyIdx].geometryKm = train.TrainJourney[journeyIdx - 1].geometryKm - point2PointDistance / 1000;
+
+                else
+                    train.TrainJourney[journeyIdx].geometryKm = train.TrainJourney[journeyIdx].kmPost;
+            }
+
+        }
+
+        public void populateLoopLocations(Train train, List<trackGeometry> trackGeometry)
+        {
+            /* Create a track geometry object. */
+            trackGeometry track = new trackGeometry();
+            int index = 0;
+            double trainPoint = 0;
+
+            /* Cycle through the train journey. */
+            foreach (TrainDetails journey in train.TrainJourney)
+            {
+                trainPoint = journey.geometryKm;
+                /* Find the index of the closest point on the track to the train. */
+                index = track.findClosestTrackGeometryPoint(trackGeometry, trainPoint);
+                /* Populate the loop */
+                journey.isLoopHere = trackGeometry[index].isLoopHere;
+
+            }
+                    
+        }
+
+        public void populateTemporarySpeedRestrictions(Train train, List<trackGeometry> trackGeometry)
+        {
+            /* Create a track geometry object. */
+            trackGeometry track = new trackGeometry();
+            int index = 0;
+            double trainPoint = 0;
+
+            /* Cycle through the train journey. */
+            foreach (TrainDetails journey in train.TrainJourney)
+            {
+                trainPoint = journey.geometryKm;
+                /* Find the index of the closest point on the track to the train. */
+                index = track.findClosestTrackGeometryPoint(trackGeometry, trainPoint);
+                /* Populate the loop */
+                journey.isTSRHere = trackGeometry[index].isTSRHere;
+                journey.TSRspeed = trackGeometry[index].temporarySpeedRestriction;
+            }
+        }
+
         /// <summary>
         /// Linear interpolation to a target point.
         /// </summary>
@@ -88,7 +194,7 @@ namespace ICEData
         /// <param name="endKm">End kilometerage for the interpolation.</param>
         /// <param name="interval">interpolation interval, specified in metres.</param>
         /// <returns>List of train objects with interpolated values at the specified interval.</returns>
-        public List<Train> interpolateTrainData(List<Train> trains, double startKm, double endKm, double interval)
+        public List<Train> interpolateTrainData(List<Train> trains, List<trackGeometry> trackGeometry, double startKm, double endKm, double interval)
         {
             /* Placeholders for the interpolated distance markers. */
             double previousKm = 0;
@@ -98,6 +204,12 @@ namespace ICEData
             /* Flag to indicate when to collect the next time value. */
             bool timeChange = true;
 
+            /* Additional loop and TSR details. */
+            int geometryIdx = 0;
+            bool loop = false;
+            bool TSR = false;
+            double TSRspeed = 0;
+                
             /* Index values for the interpolation parameters */
             int index0 = -1;
             int index1 = -1;
@@ -113,12 +225,12 @@ namespace ICEData
             List<TrainDetails> journey = new List<TrainDetails>();
 
             /* Cycle through each train to interpolate between points. */
-            for (int trainidx = 0; trainidx < trains.Count(); trainidx++)
+            for (int trainIdx = 0; trainIdx < trains.Count(); trainIdx++)
             {
                 /* Create a new journey list of interpolated values. */
                 List<InterpolatedTrain> interpolatedTrainList = new List<InterpolatedTrain>();
 
-                journey = trains[trainidx].TrainJourney;
+                journey = trains[trainIdx].TrainJourney;
 
                 if (journey[0].trainDirection == direction.increasing)
                 {
@@ -163,9 +275,24 @@ namespace ICEData
                             if (currentKm >= journey[index1].geometryKm)
                                 timeChange = true;
 
+                        geometryIdx = trackGeometry[0].findClosestTrackGeometryPoint(trackGeometry, currentKm);
+
+                        if (geometryIdx >= 0)
+                        {
+                            /* Check if there is a loop at this location. */
+                            loop = trackGeometry[geometryIdx].isLoopHere;
+
+                            /* Check if there is a TSR at this location. */
+                            TSR = trackGeometry[geometryIdx].isTSRHere;
+                            TSRspeed = trackGeometry[geometryIdx].temporarySpeedRestriction;
+                        }
+
+                        if (loop)
+                            interval = 50;
+
                         /* Create the interpolated data object and add it to the list. */
-                        InterpolatedTrain item = new InterpolatedTrain(trains[trainidx].TrainJourney[0].TrainID, trains[trainidx].TrainJourney[0].LocoID,
-                                                                        time, currentKm, interpolatedSpeed);
+                        InterpolatedTrain item = new InterpolatedTrain(trains[trainIdx].TrainJourney[0].TrainID, trains[trainIdx].TrainJourney[0].LocoID,
+                                                                        time, currentKm, interpolatedSpeed, loop, TSR, TSRspeed);
                         interpolatedTrainList.Add(item);
 
                         /* Create a copy of the current km marker and increment. */
@@ -217,10 +344,24 @@ namespace ICEData
                             if (currentKm <= journey[index0].geometryKm)
                                 timeChange = true;
 
+                        geometryIdx = trackGeometry[0].findClosestTrackGeometryPoint(trackGeometry, currentKm);
+
+                        if (geometryIdx >= 0)
+                        {
+                            /* Check if there is a loop at this location. */
+                            loop = trackGeometry[geometryIdx].isLoopHere;
+
+                            /* Check if there is a TSR at this location. */
+                            TSR = trackGeometry[geometryIdx].isTSRHere;
+                            TSRspeed = trackGeometry[geometryIdx].temporarySpeedRestriction;
+                        }
+
+                        if (loop)
+                            interval = 50;
 
                         /* Create the interpolated data object and add it to the list. */
-                        InterpolatedTrain item = new InterpolatedTrain(trains[trainidx].TrainJourney[0].TrainID, trains[trainidx].TrainJourney[0].LocoID,
-                                                                        time, currentKm, interpolatedSpeed);
+                        InterpolatedTrain item = new InterpolatedTrain(trains[trainIdx].TrainJourney[0].TrainID, trains[trainIdx].TrainJourney[0].LocoID,
+                                                                        time, currentKm, interpolatedSpeed, loop, TSR, TSRspeed);
                         interpolatedTrainList.Add(item);
 
                         /* Create a copy of the current km marker and increment. */
@@ -332,7 +473,7 @@ namespace ICEData
 
 
         /* INCOMPLETE */
-        public List<double> powerToWeightAverageSpeed(List<Train> interpolatedTrain, double lowerBound, double upperBound, direction direction)
+        public List<double> powerToWeightAverageSpeed(List<Train> trains, double lowerBound, double upperBound, direction direction)
         {
             // hardcoded size of the interpolated data.
             int size = (int)((70 - 5) / 0.05);
@@ -347,7 +488,7 @@ namespace ICEData
 
             for (int journeyIdx = 0; journeyIdx < size; journeyIdx++)
             {
-                foreach (Train train in interpolatedTrain)
+                foreach (Train train in trains)
                 {
                     journey = train.TrainJourney[journeyIdx];
                     if (journey.trainDirection == direction)
@@ -365,6 +506,13 @@ namespace ICEData
             return speed;
         }
 
+        /* ?????????? */
+        public bool include(Train train)
+        {
+            
+
+            return true;
+        }
 
 
     } // Class processing
