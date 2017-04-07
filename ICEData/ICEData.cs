@@ -151,6 +151,19 @@ namespace ICEData
             this.TrainJourney = journey;
             this.include = true;
         }
+
+        public int indexOfgeometryKm(List<TrainDetails> TrainJourney, double targetKm)
+        {
+            
+            for (int journeyIdx = 0; journeyIdx < TrainJourney.Count(); journeyIdx++)
+            {
+                // may need to include an epsilon boundary
+                if (TrainJourney[journeyIdx].geometryKm == targetKm)
+                    return journeyIdx;
+            }
+
+            return -1;
+        }
  
     }
 
@@ -163,7 +176,6 @@ namespace ICEData
         public DateTime NotificationDateTime;
         public double speed;
         public double geometryKm;
-        /**********************/
         public bool isLoopeHere;
         public bool isTSRHere;
         public double TSRspeed;
@@ -180,7 +192,6 @@ namespace ICEData
             this.NotificationDateTime = new DateTime(2000, 1, 1, 0, 0, 0);
             this.speed = 0;
             this.geometryKm = 0;
-            /************************/
             this.isLoopeHere = false;
             this.isTSRHere = false;
             this.TSRspeed = 0;
@@ -202,7 +213,6 @@ namespace ICEData
             this.NotificationDateTime = NotificationDateTime;
             this.geometryKm = geometryKm;
             this.speed = speed;
-            /************************/
             this.isLoopeHere = loop;
             this.isTSRHere = TSR;
             this.TSRspeed = TSRspeed;
@@ -220,7 +230,6 @@ namespace ICEData
             this.NotificationDateTime = details.NotificationDateTime;
             this.geometryKm = details.geometryKm;
             this.speed = details.speed;
-            /************************/  // need to make sure these values are populated when creating the object.
             this.isLoopeHere = details.isLoopHere;
             this.isTSRHere = details.isTSRHere;
             this.TSRspeed = details.TSRspeed;
@@ -347,7 +356,9 @@ namespace ICEData
             writeTrainData(unpackedInterpolation);
 
             /* Average the train data for each direction with regard for TSR's and loop locations. */
-            
+            List<double> averageSpeed = new List<double>();
+            averageSpeed = processing.powerToWeightAverageSpeed(interpolatedRecords,0,2,direction.increasing);
+
             /* seprate averages for P/W ratio groups, commodity, Operator */
 
             /* Unpack the records into a single trainDetails object list. */

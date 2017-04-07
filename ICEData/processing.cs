@@ -287,9 +287,6 @@ namespace ICEData
                             TSRspeed = trackGeometry[geometryIdx].temporarySpeedRestriction;
                         }
 
-                        if (loop)
-                            interval = 50;
-
                         /* Create the interpolated data object and add it to the list. */
                         InterpolatedTrain item = new InterpolatedTrain(trains[trainIdx].TrainJourney[0].TrainID, trains[trainIdx].TrainJourney[0].LocoID,
                                                                         time, currentKm, interpolatedSpeed, loop, TSR, TSRspeed);
@@ -355,10 +352,7 @@ namespace ICEData
                             TSR = trackGeometry[geometryIdx].isTSRHere;
                             TSRspeed = trackGeometry[geometryIdx].temporarySpeedRestriction;
                         }
-
-                        if (loop)
-                            interval = 50;
-
+                        
                         /* Create the interpolated data object and add it to the list. */
                         InterpolatedTrain item = new InterpolatedTrain(trains[trainIdx].TrainJourney[0].TrainID, trains[trainIdx].TrainJourney[0].LocoID,
                                                                         time, currentKm, interpolatedSpeed, loop, TSR, TSRspeed);
@@ -477,42 +471,100 @@ namespace ICEData
         {
             // hardcoded size of the interpolated data.
             int size = (int)((70 - 5) / 0.05);
+            double loopBoundaryThreshold = 2;   // 2 km either side of the loop.
+            double sum = 0;
+            int a = 1;
 
             List<double> speed = new List<double>();
+            List<double> averageSpeed = new List<double>();
 
             TrainDetails journey = new TrainDetails();
 
-            /********************************************************************************/
-            /* I need to determine if the point should be included based on TSR and/or loop */
-            /********************************************************************************/
-
-            for (int journeyIdx = 0; journeyIdx < size; journeyIdx++)
+            
+            for (int journeyIdx = 0; journeyIdx <= size; journeyIdx++)
             {
+                sum = 0;
+                speed.Clear();
+
                 foreach (Train train in trains)
                 {
                     journey = train.TrainJourney[journeyIdx];
                     if (journey.trainDirection == direction)
                     {
-                        if (journey.powerToWeight > lowerBound && journey.powerToWeight < upperBound) // && include ???
-                            speed.Add(journey.speed);                        
+                        /* Check train is not within the loop boundaries */
+                        if (!isTrainInLoopBoundary(train, loopBoundaryThreshold, journey.geometryKm))
+                        {
+                            /* Is there a TSR that applies */
+                            if (!isTrainInTSRBoundary())
+                            {
+                                if (journey.powerToWeight > lowerBound && journey.powerToWeight < upperBound)
+                                {
+                                    speed.Add(journey.speed);
+                                    sum = sum + journey.speed;
+                                }
+                            }
+                            else 
+                            {
+                                /* A TSR applies to the current position of the train. */
+                            }
+                        }
+                        else 
+                        { 
+                            /* Train is within the loop boundaries */
+                        }
                     }                    
                 }
-
+            
                 if (speed.Count == 0)
-                    speed.Add(0);       // This might have to be the simulated speed
+                    averageSpeed.Add(0);       // This might have to be the simulated speed
+                else
+                {
+                    
+                    if (sum == 0)
+                    {
+                        averageSpeed.Add(0);
+                    }
+                    else
+                    {
+                        averageSpeed.Add(speed.Where(x => x > 0.0).Average(x => x));
+                    }
+                }
 
             }
             // ?? speed.Where(x => x.speed > 0.0).Average(x => x.speed); // something like this.
-            return speed;
+            return averageSpeed;
         }
 
         /* ?????????? */
-        public bool include(Train train)
+        public bool isTrainInLoopBoundary(Train train, double loopThreshold, double targetLocation)
         {
             
+            double lookBack = targetLocation - loopThreshold;
+            double lookForward = targetLocation + loopThreshold;
+            int lookBackIdx = train.indexOfgeometryKm(train.TrainJourney, lookBack);
+            int lookForwardIdx = train.indexOfgeometryKm(train.TrainJourney, lookForward);
 
-            return true;
+            if (lookBackIdx >= 0 && lookForwardIdx >= 0)
+            {
+                for (int journeyIdx = lookBackIdx; journeyIdx < lookForwardIdx; journeyIdx++)
+                {
+                    TrainDetails journey = train.TrainJourney[journeyIdx];
+
+                    if (journey.isLoopHere)
+                        return true;
+
+                }
+
+            }
+            return false;
         }
+
+        public bool isTrainInTSRBoundary()
+        {
+
+            return false;
+        }
+
 
 
     } // Class processing
