@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using GlobalSettings;
 
 namespace ICEData
 {
@@ -209,7 +210,7 @@ namespace ICEData
         /// <param name="endKm">End kilometerage for the interpolation.</param>
         /// <param name="interval">interpolation interval, specified in metres.</param>
         /// <returns>List of train objects with interpolated values at the specified interval.</returns>
-        public List<Train> interpolateTrainData(List<Train> trains, List<trackGeometry> trackGeometry, double startKm, double endKm, double interval)
+        public List<Train> interpolateTrainData(List<Train> trains, List<trackGeometry> trackGeometry)
         {
             /* Placeholders for the interpolated distance markers. */
             double previousKm = 0;
@@ -250,9 +251,9 @@ namespace ICEData
                 if (journey[0].trainDirection == direction.increasing)
                 {
                     /* Set the start of the interpolation. */
-                    currentKm = startKm;
+                    currentKm = Settings.startKm;
 
-                    while (currentKm < endKm)
+                    while (currentKm < Settings.endKm)
                     {
                         /* Find the closest kilometerage markers either side of the current interpoaltion point. */
                         index0 = findClosestLowerKm(currentKm, journey);
@@ -309,7 +310,7 @@ namespace ICEData
 
                         /* Create a copy of the current km marker and increment. */
                         previousKm = currentKm;
-                        currentKm = currentKm + interval / 1000;
+                        currentKm = currentKm + Settings.interval / 1000;
 
                     }
 
@@ -317,9 +318,9 @@ namespace ICEData
                 else if (journey[0].trainDirection == direction.decreasing)
                 {
                     /* Set the start of the interpolation. */
-                    currentKm = endKm;
+                    currentKm = Settings.endKm;
 
-                    while (currentKm > startKm)
+                    while (currentKm > Settings.startKm)
                     {
                         /* Find the closest kilometerage markers either side of the current interpoaltion point. */
                         index0 = findClosestLowerKm(currentKm, journey);
@@ -375,7 +376,7 @@ namespace ICEData
 
                         /* Create a copy of the current km marker and increment. */
                         previousKm = currentKm;
-                        currentKm = currentKm - interval / 1000;
+                        currentKm = currentKm - Settings.interval / 1000;
 
                     }
 
@@ -404,7 +405,7 @@ namespace ICEData
         /// <param name="endKm">End kilometerage for the interpolation.</param>
         /// <param name="interval">interpolation interval, specified in metres.</param>
         /// <returns>List of interpolated values for the simulation.</returns>
-        public List<InterpolatedTrain> interpolateSimulationData(List<simulatedTrain> simulatedTrain, List<trackGeometry> trackGeometry, double startKm, double endKm, double interval)
+        public List<InterpolatedTrain> interpolateSimulationData(List<simulatedTrain> simulatedTrain, List<trackGeometry> trackGeometry)
         {
             /* Placeholders for the interpolated distance markers. */
             double previousKm = 0;
@@ -435,9 +436,9 @@ namespace ICEData
             if (simulatedTrain[1].singleLineKm - simulatedTrain[0].singleLineKm > 0)    // Increasing Km
             {
                 /* Set the start of the interpolation. */
-                currentKm = startKm;
+                currentKm = Settings.startKm;
 
-                while (currentKm < endKm)
+                while (currentKm < Settings.endKm)
                 {
                     /* Find the closest kilometerage markers either side of the current interpoaltion point. */
                     index0 = findClosestLowerKm(currentKm, simulatedTrain);
@@ -499,7 +500,7 @@ namespace ICEData
 
                     /* Create a copy of the current km marker and increment. */
                     previousKm = currentKm;
-                    currentKm = currentKm + interval / 1000;
+                    currentKm = currentKm + Settings.interval / 1000;
 
                 }
 
@@ -507,9 +508,9 @@ namespace ICEData
             else              // Decreasing km.            
             {
                 /* Set the start of the interpolation. */
-                currentKm = endKm;
+                currentKm = Settings.endKm;
 
-                while (currentKm > startKm)
+                while (currentKm > Settings.startKm)
                 {
                     /* Find the closest kilometerage markers either side of the current interpoaltion point. */
                     index0 = findClosestLowerKm(currentKm, simulatedTrain);
@@ -570,7 +571,7 @@ namespace ICEData
 
                     /* Create a copy of the current km marker and increment. */
                     previousKm = currentKm;
-                    currentKm = currentKm - interval / 1000;
+                    currentKm = currentKm - Settings.interval / 1000;
                 }
             }
 
@@ -743,15 +744,8 @@ namespace ICEData
         /// <returns>A list for the average speed of trains within the power to weight range.</returns>
         public List<double> powerToWeightAverageSpeed(List<Train> trains, List<InterpolatedTrain> simulation, double lowerBound, double upperBound, direction direction)
         {
-            // hardcoded size of the interpolated data.
-            double start = 5;
-            double end = 70;
-            double interval = 50;
-            double loopSpeedThreshold = 0.5;
-
-
-            int size = (int)((end - start) / (interval/1000) );
-            double loopBoundaryThreshold = 2;   // 2 km either side of the loop.
+            
+            int size = (int)((Settings.endKm - Settings.startKm) / (Settings.interval / 1000));
             double sum = 0;
             
             /* Place holders for the included speeds and teh resulting average speed at each location. */
@@ -778,7 +772,7 @@ namespace ICEData
                         if (!isTrainInTSRBoundary())
                         {
                             /* Check train is not within the loop boundaries */
-                            if (!isTrainInLoopBoundary(train, loopBoundaryThreshold, journey.geometryKm))
+                            if (!isTrainInLoopBoundary(train, Settings.loopBoundaryThreshold, journey.geometryKm))
                             {
                                 if (journey.powerToWeight > lowerBound && journey.powerToWeight < upperBound)
                                 {
@@ -788,8 +782,8 @@ namespace ICEData
                             }
                             else 
                             {
-                                /* Train is within the loop boundaries */        
-                                if (journey.speed > (simulation[journeyIdx].speed * loopSpeedThreshold))
+                                /* Train is within the loop boundaries */
+                                if (journey.speed > (simulation[journeyIdx].speed * Settings.loopSpeedThreshold))
                                 {
                                     speed.Add(journey.speed);
                                     sum = sum + journey.speed;
@@ -832,10 +826,7 @@ namespace ICEData
        /// <returns>True, if the train is within the boundaries of teh loop window.</returns>
         public bool isTrainInLoopBoundary(Train train, double loopThreshold, double targetLocation)
         {
-            /* Start and end kilometerage of the interpolated data. */
-            double start = 5;
-            double end = 70;
-
+            
             /* Find the indecies of the boundaries of the loop. */
             double lookBack = targetLocation - loopThreshold;
             double lookForward = targetLocation + loopThreshold;
@@ -843,9 +834,9 @@ namespace ICEData
             int lookForwardIdx = train.indexOfgeometryKm(train.TrainJourney, lookForward);
 
             /* Check the indecies are valid */
-            if (lookBack < start && lookBackIdx == -1)
+            if (lookBack < Settings.startKm && lookBackIdx == -1)
                 lookBackIdx = 0;
-            if (lookForward > end && lookForwardIdx == -1)
+            if (lookForward > Settings.endKm && lookForwardIdx == -1)
                 lookForwardIdx = train.TrainJourney.Count() - 1;
 
             /* Determine if a loop is within the loop window of the current position. */

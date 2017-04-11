@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using GlobalSettings;
 
 namespace ICEData
 {
@@ -408,16 +409,22 @@ namespace ICEData
         {
             /* Artificial input parameters. */
             /* These parameters will be passed into the program. */
-            DateTime[] dateRange = new DateTime[2] { new DateTime(2016, 1, 1), new DateTime(2016, 2, 1) };
-            bool includeAListOfTrainsToExclude = false;
-            double interval = 50;
-            /* Corridor dependant parameters. */
-            double startKm = 5;
-            double endKm = 70;
-            double minimumJourneyDistance = 40000;
-            double[] latitude = new double[2] { -33.0, -35.0 };
-            double[] longitude = new double[2] { 150.0, 152.0 };
+            Settings.dateRange = new DateTime[2] { new DateTime(2016, 1, 1), new DateTime(2016, 2, 1) };
+            Settings.latitude = new double[2] { -33.0, -35.0 };
+            Settings.longitude = new double[2] { 150.0, 152.0 };
+            Settings.includeAListOfTrainsToExclude = false;
+
+            Settings.startKm = 5;
+            Settings.endKm = 70;
+            Settings.interval = 50;
+            Settings.minimumJourneyDistance = 40000;
+
+            Settings.loopSpeedThreshold = 0.5;
+            Settings.loopBoundaryThreshold = 2;
+            Settings.timeThreshold = 10 * 60;
+            Settings.distanceThreshold = 4000;
             
+
             /* Ensure there is a empty list of trains to exclude to start. */
             List<string> excludeTrainList = new List<string> { };
 
@@ -439,7 +446,7 @@ namespace ICEData
             //tool.browseFile("Seelect the Simulation file with decreasing km.");
 
 
-            if (includeAListOfTrainsToExclude)
+            if (Settings.includeAListOfTrainsToExclude)
             {
                 trainList = tool.browseFile("Select the train list file.");
 
@@ -457,16 +464,16 @@ namespace ICEData
             List<simulatedTrain> increasingSimulation = new List<simulatedTrain>();
             increasingSimulation = readSimulationData(increasingSimulationFile);
             List<InterpolatedTrain> simulationIncreasing = new List<InterpolatedTrain>();
-            simulationIncreasing = processing.interpolateSimulationData(increasingSimulation, trackGeometry, startKm, endKm, interval);
+            simulationIncreasing = processing.interpolateSimulationData(increasingSimulation, trackGeometry);
             /* Decreasing direction. */
             List<simulatedTrain> decreasingSimulation = new List<simulatedTrain>();
             decreasingSimulation = readSimulationData(decreasingSimulationFile);
             List<InterpolatedTrain> simulationDecreasing = new List<InterpolatedTrain>();
-            simulationDecreasing = processing.interpolateSimulationData(decreasingSimulation, trackGeometry, startKm, endKm, interval);
+            simulationDecreasing = processing.interpolateSimulationData(decreasingSimulation, trackGeometry);
             
             /* Read the data. */
             List<TrainDetails> TrainRecords = new List<TrainDetails>();
-            TrainRecords = readICEData(filename, latitude, longitude, dateRange, excludeTrainList);
+            TrainRecords = readICEData(filename, excludeTrainList);
 
             /* Sort the data by [trainID, locoID, Date & Time, kmPost]. */
             List<TrainDetails> OrderdTrainRecords = new List<TrainDetails>();
@@ -475,12 +482,12 @@ namespace ICEData
             /* Clean data - remove trains with insufficient data. */
             /******** Should only be required while we are waiting for the data in the prefered format ********/
             List<Train> CleanTrainRecords = new List<Train>();
-            CleanTrainRecords = CleanData(trackGeometry, OrderdTrainRecords, minimumJourneyDistance);
+            CleanTrainRecords = CleanData(trackGeometry, OrderdTrainRecords);
 
             /* interpolate data */
             /******** Should only be required while we are waiting for the data in the prefered format ********/
             List<Train> interpolatedRecords = new List<Train>();
-            interpolatedRecords = processing.interpolateTrainData(CleanTrainRecords, trackGeometry, startKm, endKm, interval);
+            interpolatedRecords = processing.interpolateTrainData(CleanTrainRecords, trackGeometry);
             List<InterpolatedTrain> unpackedInterpolation = new List<InterpolatedTrain>();
             unpackedInterpolation = unpackInterpolatedData(interpolatedRecords);
             writeTrainData(unpackedInterpolation);
@@ -533,7 +540,7 @@ namespace ICEData
         /// </summary>
         /// <param name="filename">The filename of the ICE data</param>
         /// <returns>The list of trainDetails objects containnig each valid record.</returns>
-        public static List<TrainDetails> readICEData(string filename, double[] latitudeRange, double[] longitudeRange, DateTime[] dateRange, List<string> excludeTrainList)
+        public static List<TrainDetails> readICEData(string filename, List<string> excludeTrainList)
         {
             /* Read all the lines of the data file. */
             string[] lines = System.IO.File.ReadAllLines(filename);
@@ -580,9 +587,9 @@ namespace ICEData
                     /* Check if the train is in the exclude list */
                     includeTrain = excludeTrainList.Contains(TrainID);
 
-                    if (latitude < latitudeRange[0] && latitude > latitudeRange[1] &&
-                        longitude > longitudeRange[0] && longitude < longitudeRange[1] &&
-                        NotificationDateTime >= dateRange[0] && NotificationDateTime < dateRange[1] &&
+                    if (latitude < Settings.latitude[0] && latitude > Settings.latitude[1] &&
+                        longitude > Settings.longitude[0] && longitude < Settings.longitude[1] &&
+                        NotificationDateTime >= Settings.dateRange[0] && NotificationDateTime < Settings.dateRange[1] &&
                         !includeTrain)
                     {
                         TrainDetails record = new TrainDetails(TrainID, locoID, NotificationDateTime, latitude, longitude, speed, kmPost, geometryKm, direction.notSpecified,false,false,0);
@@ -954,14 +961,12 @@ namespace ICEData
         /// <param name="minimumJourneyDistance">The minimum required distance a train must travel 
         /// to be included in the analysis.</param>
         /// <returns>List of Train objects containign the journey details of each train.</returns>
-        public static List<Train> CleanData(List<trackGeometry> trackGeometry, List<TrainDetails> OrderdTrainRecords, double minimumJourneyDistance)
+        public static List<Train> CleanData(List<trackGeometry> trackGeometry, List<TrainDetails> OrderdTrainRecords)
         {
             bool removeTrain = false;
-            double distanceThreshold = 4000; // metres
             double distance = 0;
             double journeyDistance = 0;
-            double timeThreshold = 10 * 60; // 10 hours between trains with the same Train ID and Loco ID
-
+            
             GeoLocation point1 = null;
             GeoLocation point2 = null;
 
@@ -982,7 +987,7 @@ namespace ICEData
                 
                 if (OrderdTrainRecords[trainIndex].TrainID.Equals(OrderdTrainRecords[trainIndex - 1].TrainID) &&
                     OrderdTrainRecords[trainIndex].LocoID.Equals(OrderdTrainRecords[trainIndex - 1].LocoID) &&
-                    (OrderdTrainRecords[trainIndex].NotificationDateTime - OrderdTrainRecords[trainIndex - 1].NotificationDateTime).TotalMinutes < timeThreshold)
+                    (OrderdTrainRecords[trainIndex].NotificationDateTime - OrderdTrainRecords[trainIndex - 1].NotificationDateTime).TotalMinutes < Settings.timeThreshold)
                 {
                     /* If the current and previous record represent the same train journey, add it to the list. */
                     newTrainList.Add(OrderdTrainRecords[trainIndex]);
@@ -993,7 +998,7 @@ namespace ICEData
                     distance = processing.calculateDistance(point1, point2);
                     journeyDistance = journeyDistance + distance;
                     
-                    if (distance > distanceThreshold)
+                    if (distance > Settings.distanceThreshold)
                     {
                         /* If the distance between successive km points is greater than the
                          * threshold then we want to remove this train from the data. 
@@ -1005,7 +1010,7 @@ namespace ICEData
                 else
                 {
                     /* The end of the train journey had been reached. */
-                    if (!removeTrain && journeyDistance > minimumJourneyDistance)
+                    if (!removeTrain && journeyDistance > Settings.minimumJourneyDistance)
                     {
                         /* If all points are acceptable and the train ravels the minimum distance, 
                          * add the train journey to the cleaned list. 
