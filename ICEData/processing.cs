@@ -8,10 +8,15 @@ namespace ICEData
 {
     class processing
     {
-        // Mean radius of the Earth
+        /* Mean radius of the Earth */
         private const double EarthRadius = 6371000.0;   // metres
+        /* Constant time factors. */
+        private const double secPerHour = 3600;
+        private const double secPerDay = 86400;
+        private const double hoursPerDay = 24;
+        private const double minutesPerHour = 60;
+        private const double secPerMinute = 60;
 
-        //trackGeometry track = new trackGeometry();
         
         /// <summary>
         /// Convert degrees in to radians
@@ -61,8 +66,7 @@ namespace ICEData
             return EarthRadius * arclength;
 
         }
-
-        
+                
         /// <summary>
         /// Function determines the direction of the train using the first and last km posts.
         /// </summary>
@@ -128,6 +132,11 @@ namespace ICEData
 
         }
 
+        /// <summary>
+        /// Populate the loop location information for each point in the train journey.
+        /// </summary>
+        /// <param name="train">A train object containing the journey details.</param>
+        /// <param name="trackGeometry">The track geometry object indicating the location of the loops.</param>
         public void populateLoopLocations(Train train, List<trackGeometry> trackGeometry)
         {
             /* Create a track geometry object. */
@@ -148,6 +157,11 @@ namespace ICEData
                     
         }
 
+        /// <summary>
+        /// populate the temporary speed rrestrcition information for each train journey.
+        /// </summary>
+        /// <param name="train">A train object containing teh journey details.</param>
+        /// <param name="trackGeometry">teh track Geometry object indicating the TSR information at each location.</param>
         public void populateTemporarySpeedRestrictions(Train train, List<trackGeometry> trackGeometry)
         {
             /* Create a track geometry object. */
@@ -187,9 +201,10 @@ namespace ICEData
         }
 
         /// <summary>
-        ///  Interpolate the train speed to s specified interval using a linear interpolation.
+        ///  Interpolate the train speed to a specified interval using a linear interpolation.
         /// </summary>
         /// <param name="trains">List of train objects containing the parameters for each train journey.</param>
+        /// <param name="trackGeometry">The list of Track geometry data to align the train location.</param>
         /// <param name="startKm">Starting kilometreage for the interpolation.</param>
         /// <param name="endKm">End kilometerage for the interpolation.</param>
         /// <param name="interval">interpolation interval, specified in metres.</param>
@@ -381,6 +396,189 @@ namespace ICEData
         }
 
         /// <summary>
+        /// Interpolate the simultion data to a specified interval using a linear interpolation.
+        /// </summary>
+        /// <param name="simulatedTrain">The list of the simulated train details.</param>
+        /// <param name="trackGeometry">The list of Track geometry data to align the train location.</param>
+        /// <param name="startKm">Starting kilometreage for the interpolation.</param>
+        /// <param name="endKm">End kilometerage for the interpolation.</param>
+        /// <param name="interval">interpolation interval, specified in metres.</param>
+        /// <returns>List of interpolated values for the simulation.</returns>
+        public List<InterpolatedTrain> interpolateSimulationData(List<simulatedTrain> simulatedTrain, List<trackGeometry> trackGeometry, double startKm, double endKm, double interval)
+        {
+            /* Placeholders for the interpolated distance markers. */
+            double previousKm = 0;
+            double currentKm = 0;
+            /* Place holder to calaculte the time for each interpolated value. */
+            DateTime simTime = new DateTime();
+            double time = 0;
+            double days, hours, minutes, seconds;
+            /* Flag to indicate when to collect the next time value. */
+            bool timeChange = true;
+
+            /* Additional loop and TSR details. */
+            int geometryIdx = 0;
+            bool loop = false;
+            bool TSR = false;
+            double TSRspeed = 0;
+
+            /* Index values for the interpolation parameters */
+            int index0 = -1;
+            int index1 = -1;
+
+            /* Interplation parameters. */
+            double interpolatedSpeed = 0;
+            double X0, X1, Y0, Y1;
+
+            List<InterpolatedTrain> simulatedInterpolation = new List<InterpolatedTrain>();
+
+            if (simulatedTrain[1].singleLineKm - simulatedTrain[0].singleLineKm > 0)    // Increasing Km
+            {
+                /* Set the start of the interpolation. */
+                currentKm = startKm;
+
+                while (currentKm < endKm)
+                {
+                    /* Find the closest kilometerage markers either side of the current interpoaltion point. */
+                    index0 = findClosestLowerKm(currentKm, simulatedTrain);
+                    index1 = findClosestGreaterKm(currentKm, simulatedTrain);
+
+                    /* If a valid index is found, extract the existing journey parameters and interpolate. */
+                    if (index0 >= 0 && index1 >= 0)
+                    {
+                        X0 = simulatedTrain[index0].singleLineKm;
+                        X1 = simulatedTrain[index1].singleLineKm;
+                        Y0 = simulatedTrain[index0].velocity;
+                        Y1 = simulatedTrain[index1].velocity;
+                        if (timeChange)
+                        {
+                            time = simulatedTrain[index0].time;
+                            days = (time / secPerDay);
+                            hours = (days - Math.Truncate(days)) * hoursPerDay;
+                            minutes = (hours - Math.Truncate(hours)) * minutesPerHour;
+                            seconds = (minutes - Math.Truncate(minutes)) * secPerMinute;
+
+                            simTime = new DateTime(2000, 1, (int)days+1, (int)hours, (int)minutes, (int)seconds);
+                            timeChange = false;
+                        }
+
+                        /* Perform linear interpolation. */
+                        interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
+                        /* Interpolate the time. */
+                        simTime = simTime.AddHours(calculateTimeInterval(previousKm, currentKm, interpolatedSpeed));
+
+                    }
+                    else
+                    {
+                        /* Boundary conditions for interpolating the data prior to and beyond the existing journey points. */
+                        time = 0;
+                        interpolatedSpeed = 0;
+
+                    }
+
+                    /* Determine if we need to extract the time from the data or interpolate it. */
+                    if (index1 >= 0)
+                        if (currentKm >= simulatedTrain[index1].singleLineKm)
+                            timeChange = true;
+
+                    geometryIdx = trackGeometry[0].findClosestTrackGeometryPoint(trackGeometry, currentKm);
+
+                    if (geometryIdx >= 0)
+                    {
+                        /* Check if there is a loop at this location. */
+                        loop = trackGeometry[geometryIdx].isLoopHere;
+
+                        /* Check if there is a TSR at this location. */
+                        TSR = trackGeometry[geometryIdx].isTSRHere;
+                        TSRspeed = trackGeometry[geometryIdx].temporarySpeedRestriction;
+                    }
+
+                    /* Create the interpolated data object and add it to the list. */
+                    InterpolatedTrain item = new InterpolatedTrain("Simulated Train", "Simulated Loco", simTime, currentKm, interpolatedSpeed, loop, TSR, TSRspeed);
+                    simulatedInterpolation.Add(item);
+
+                    /* Create a copy of the current km marker and increment. */
+                    previousKm = currentKm;
+                    currentKm = currentKm + interval / 1000;
+
+                }
+
+            }
+            else              // Decreasing km.            
+            {
+                /* Set the start of the interpolation. */
+                currentKm = endKm;
+
+                while (currentKm > startKm)
+                {
+                    /* Find the closest kilometerage markers either side of the current interpoaltion point. */
+                    index0 = findClosestLowerKm(currentKm, simulatedTrain);
+                    index1 = findClosestGreaterKm(currentKm, simulatedTrain);
+
+                    /* If a valid index is found, extract the existing journey parameters and interpolate. */
+                    if (index0 >= 0 && index1 >= 0)
+                    {
+                        X0 = simulatedTrain[index0].singleLineKm;
+                        X1 = simulatedTrain[index1].singleLineKm;
+                        Y0 = simulatedTrain[index0].velocity;
+                        Y1 = simulatedTrain[index1].velocity;
+                        if (timeChange)
+                        {
+                            time = simulatedTrain[index0].time;
+                            days = (time / secPerDay);
+                            hours = (days - Math.Truncate(days)) * hoursPerDay;
+                            minutes = (hours - Math.Truncate(hours)) * minutesPerHour;
+                            seconds = (minutes - Math.Truncate(minutes)) * secPerMinute;
+
+                            simTime = new DateTime(2000, 1, (int)days+1, (int)hours, (int)minutes, (int)seconds);
+                            timeChange = false;
+                        }
+
+                        /* Perform linear interpolation. */
+                        interpolatedSpeed = linear(currentKm, X0, X1, Y0, Y1);
+                        /* Interpolate the time. */
+                        simTime = simTime.AddHours(calculateTimeInterval(previousKm, currentKm, interpolatedSpeed));
+
+                    }
+                    else
+                    {
+                        /* Boundary conditions for interpolating the data prior to and beyond the existing journey points. */
+                        time = 0;
+                        interpolatedSpeed = 0;
+                    }
+
+                    /* Determine if we need to extract the time from the data or interpolate it. */
+                    if (index0 >= 0)
+                        if (currentKm <= simulatedTrain[index0].singleLineKm)
+                            timeChange = true;
+
+                    geometryIdx = trackGeometry[0].findClosestTrackGeometryPoint(trackGeometry, currentKm);
+
+                    if (geometryIdx >= 0)
+                    {
+                        /* Check if there is a loop at this location. */
+                        loop = trackGeometry[geometryIdx].isLoopHere;
+
+                        /* Check if there is a TSR at this location. */
+                        TSR = trackGeometry[geometryIdx].isTSRHere;
+                        TSRspeed = trackGeometry[geometryIdx].temporarySpeedRestriction;
+                    }
+
+                    /* Create the interpolated data object and add it to the list. */
+                    InterpolatedTrain item = new InterpolatedTrain("Simualted Train","Simulated Loco",simTime, currentKm, interpolatedSpeed, loop, TSR, TSRspeed);
+                    simulatedInterpolation.Add(item);
+
+                    /* Create a copy of the current km marker and increment. */
+                    previousKm = currentKm;
+                    currentKm = currentKm - interval / 1000;
+                }
+            }
+
+            return simulatedInterpolation;
+        }
+
+
+        /// <summary>
         /// Calculate the time interval between two locations based on the speed.
         /// </summary>
         /// <param name="startPositon">Starting kilometreage.</param>
@@ -429,6 +627,42 @@ namespace ICEData
         }
 
         /// <summary>
+        /// Find the index of the closest kilometerage that is less than the target point.
+        /// </summary>
+        /// <param name="target">The target kilometerage.</param>
+        /// <param name="journey">The list of train details containig the journey parameters.</param>
+        /// <returns>The index of the closest point that is less than the target point. 
+        /// Returns -1 if a point does not exist.</returns>
+        private int findClosestLowerKm(double target, List<simulatedTrain> journey)
+        {
+            /* set the initial values. */
+            double minimum = double.MaxValue;
+            double difference = double.MaxValue;
+            int index = 0;
+
+            /* Cycle through the journey parameters. */
+            for (int journeyIdx = 0; journeyIdx < journey.Count(); journeyIdx++)
+            {
+                /* Find the difference if the value is lower. */
+                if (journey[journeyIdx].singleLineKm < target)
+                    difference = Math.Abs(journey[journeyIdx].singleLineKm - target);
+
+                /* Find the minimum difference. */
+                if (difference < minimum)
+                {
+                    minimum = difference;
+                    index = journeyIdx;
+                }
+
+            }
+
+            if (difference == double.MaxValue)
+                return -1;
+
+            return index;
+        }
+
+        /// <summary>
         /// Find the index of the closest kilometerage that is larger than the target point.
         /// </summary>
         /// <param name="target">The target kilometerage.</param>
@@ -455,7 +689,6 @@ namespace ICEData
                     minimum = difference;
                     index = journeyIdx;
                 }
-
             }
 
             if (difference == double.MaxValue)
@@ -464,38 +697,88 @@ namespace ICEData
             return index;
         }
 
+        /// <summary>
+        /// Find the index of the closest kilometerage that is larger than the target point.
+        /// </summary>
+        /// <param name="target">The target kilometerage.</param>
+        /// <param name="journey">The list of simulated train data containig the journey parameters.</param>
+        /// <returns>The index of the closest point that is larger than the target point. 
+        /// Returns -1 if a point does not exist.</returns>        
+        private int findClosestGreaterKm(double target, List<simulatedTrain> journey)
+        {
+            /* set the initial values. */
+            double minimum = double.MaxValue;
+            double difference = double.MaxValue;
+            int index = 0;
 
+            /* Cycle through the journey parameters. */
+            for (int journeyIdx = 0; journeyIdx < journey.Count(); journeyIdx++)
+            {
+                /* Find the difference if the value is lower. */
+                if (journey[journeyIdx].singleLineKm > target)
+                    difference = Math.Abs(journey[journeyIdx].singleLineKm - target);
 
-        /* INCOMPLETE */
-        public List<double> powerToWeightAverageSpeed(List<Train> trains, double lowerBound, double upperBound, direction direction)
+                /* Find the minimum difference. */
+                if (difference < minimum)
+                {
+                    minimum = difference;
+                    index = journeyIdx;
+                }
+            }
+
+            if (difference == double.MaxValue)
+                return -1;
+
+            return index;
+        }
+
+        /// <summary>
+        /// Determine the average speed of all trains in a specified direction given a power to weight range.
+        /// </summary>
+        /// <param name="trains">All train data containig each train journey details.</param>
+        /// <param name="simulation">The journey of the simulated train.</param>
+        /// <param name="lowerBound">The lower bound of the acceptable power to weight ratio.</param>
+        /// <param name="upperBound">The upper bound of the acceptable power to weight ratio.</param>
+        /// <param name="direction">The direction of the km of the train journey.</param>
+        /// <returns>A list for the average speed of trains within the power to weight range.</returns>
+        public List<double> powerToWeightAverageSpeed(List<Train> trains, List<InterpolatedTrain> simulation, double lowerBound, double upperBound, direction direction)
         {
             // hardcoded size of the interpolated data.
-            int size = (int)((70 - 5) / 0.05);
+            double start = 5;
+            double end = 70;
+            double interval = 50;
+            double loopSpeedThreshold = 0.5;
+
+
+            int size = (int)((end - start) / (interval/1000) );
             double loopBoundaryThreshold = 2;   // 2 km either side of the loop.
             double sum = 0;
-            int a = 1;
-
+            
+            /* Place holders for the included speeds and teh resulting average speed at each location. */
             List<double> speed = new List<double>();
             List<double> averageSpeed = new List<double>();
 
             TrainDetails journey = new TrainDetails();
-
             
+            /* Loop through each interpoalted location. */
             for (int journeyIdx = 0; journeyIdx <= size; journeyIdx++)
             {
                 sum = 0;
                 speed.Clear();
-
+                
+                /* Loop through each train. */
                 foreach (Train train in trains)
                 {
                     journey = train.TrainJourney[journeyIdx];
+
                     if (journey.trainDirection == direction)
                     {
-                        /* Check train is not within the loop boundaries */
-                        if (!isTrainInLoopBoundary(train, loopBoundaryThreshold, journey.geometryKm))
+                            
+                        /* Is there a TSR that applies */                        
+                        if (!isTrainInTSRBoundary())
                         {
-                            /* Is there a TSR that applies */
-                            if (!isTrainInTSRBoundary())
+                            /* Check train is not within the loop boundaries */
+                            if (!isTrainInLoopBoundary(train, loopBoundaryThreshold, journey.geometryKm))
                             {
                                 if (journey.powerToWeight > lowerBound && journey.powerToWeight < upperBound)
                                 {
@@ -505,12 +788,17 @@ namespace ICEData
                             }
                             else 
                             {
-                                /* A TSR applies to the current position of the train. */
+                                /* Train is within the loop boundaries */        
+                                if (journey.speed > (simulation[journeyIdx].speed * loopSpeedThreshold))
+                                {
+                                    speed.Add(journey.speed);
+                                    sum = sum + journey.speed;
+                                }
                             }
                         }
                         else 
-                        { 
-                            /* Train is within the loop boundaries */
+                        {
+                            /* A TSR applies to the current position on the train. */
                         }
                     }                    
                 }
@@ -531,19 +819,36 @@ namespace ICEData
                 }
 
             }
-            // ?? speed.Where(x => x.speed > 0.0).Average(x => x.speed); // something like this.
+            
             return averageSpeed;
         }
 
-        /* ?????????? */
+       /// <summary>
+       /// Determine if the train is approaching, leaving or within a loop.
+       /// </summary>
+       /// <param name="train">The train object containing the journey details.</param>
+       /// <param name="loopThreshold">The window either side of the loop to consider the train within the loop boundary.</param>
+       /// <param name="targetLocation">The specific location being considered.</param>
+       /// <returns>True, if the train is within the boundaries of teh loop window.</returns>
         public bool isTrainInLoopBoundary(Train train, double loopThreshold, double targetLocation)
         {
-            
+            /* Start and end kilometerage of the interpolated data. */
+            double start = 5;
+            double end = 70;
+
+            /* Find the indecies of the boundaries of the loop. */
             double lookBack = targetLocation - loopThreshold;
             double lookForward = targetLocation + loopThreshold;
             int lookBackIdx = train.indexOfgeometryKm(train.TrainJourney, lookBack);
             int lookForwardIdx = train.indexOfgeometryKm(train.TrainJourney, lookForward);
 
+            /* Check the indecies are valid */
+            if (lookBack < start && lookBackIdx == -1)
+                lookBackIdx = 0;
+            if (lookForward > end && lookForwardIdx == -1)
+                lookForwardIdx = train.TrainJourney.Count() - 1;
+
+            /* Determine if a loop is within the loop window of the current position. */
             if (lookBackIdx >= 0 && lookForwardIdx >= 0)
             {
                 for (int journeyIdx = lookBackIdx; journeyIdx < lookForwardIdx; journeyIdx++)
@@ -554,11 +859,11 @@ namespace ICEData
                         return true;
 
                 }
-
             }
             return false;
         }
 
+        /* Dummy TSR boundary function. */
         public bool isTrainInTSRBoundary()
         {
 

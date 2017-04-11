@@ -29,7 +29,6 @@ namespace ICEData
         public double kmPost;
         public double geometryKm;
         public direction trainDirection;
-        /*******************/
         public bool isLoopHere;
         public bool isTSRHere;
         public double TSRspeed;
@@ -49,7 +48,6 @@ namespace ICEData
             this.kmPost = 0;
             this.geometryKm = 0;
             this.trainDirection = direction.notSpecified;
-            /*******************/
             this.isLoopHere = false;
             this.isTSRHere = false;
             this.TSRspeed = 0;
@@ -152,13 +150,19 @@ namespace ICEData
             this.include = true;
         }
 
+        /// <summary>
+        /// Determine the index of the geomerty data for the supplied kilometreage.
+        /// </summary>
+        /// <param name="TrainJourney">List of train details objects containt the journey details of the train.</param>
+        /// <param name="targetKm">The target location to find in the geomerty data.</param>
+        /// <returns>The index of the target kilometreage in teh geomerty data, -1 if the target is not found.</returns>
         public int indexOfgeometryKm(List<TrainDetails> TrainJourney, double targetKm)
         {
-            
+            /* Loop through the train journey. */
             for (int journeyIdx = 0; journeyIdx < TrainJourney.Count(); journeyIdx++)
             {
-                // may need to include an epsilon boundary
-                if (TrainJourney[journeyIdx].geometryKm == targetKm)
+                /* match the current location with the geometry information. */
+                if (Math.Abs(TrainJourney[journeyIdx].geometryKm - targetKm) *1e12 < 1)
                     return journeyIdx;
             }
 
@@ -167,7 +171,9 @@ namespace ICEData
  
     }
 
-    /* A class to hold the interpolated train details. */
+    /// <summary>
+    /// A class to hold the interpolated train details.
+    /// </summary>
     public class InterpolatedTrain
     {
         public string TrainID;
@@ -237,7 +243,102 @@ namespace ICEData
     }
 
     /// <summary>
-    /// A class describing a geographic location
+    /// A class to hold the simulated train data.
+    /// </summary>
+    public class simulatedTrain
+    {
+        public double kmPoint;
+        public double singleLineKm;
+        public GeoLocation location = new GeoLocation();
+        public double elevation;
+        public string TraximNode;
+        public string TraximSection;
+        public double time;
+        public double velocity;
+        public double previousDistance;
+        public double maxSpeed;
+
+        /// <summary>
+        /// Default SimulatedTrain constructor.
+        /// </summary>
+        public simulatedTrain()
+        {
+            kmPoint = 0;
+            singleLineKm = 0;
+            location.latitude = -33.8519;   //Sydney Harbour Bridge
+            location.longitude = 151.2108;
+            elevation = 0;
+            TraximNode = "none";
+            TraximSection = "none";
+            time = 0;
+            velocity = 0;
+            previousDistance = 0;
+            maxSpeed = 0;
+        }
+
+        /// <summary>
+        /// SimulatedTrain object constructor
+        /// </summary>
+        /// <param name="kmPoint">kilometreage of the simualted train.</param>
+        /// <param name="singleLineKm">Cummulative kilometreage of the simulated train.</param>
+        /// <param name="location">Geographoc location of the simualted train.</param>
+        /// <param name="elevation">Elevation of the simulated train.</param>
+        /// <param name="TraximNode">The Traxim node relevant to the current location</param>
+        /// <param name="TraximSection">The Traxim section relevant to the current location</param>
+        /// <param name="time">Cummulative time in seconds of the simulated train.</param>
+        /// <param name="velocity">The instantaneous velocity of the simualted train at the current location.</param>
+        /// <param name="previousDistance">The distance in metres traveled between the previous position and the current position.</param>
+        /// <param name="maxSpeed">The maximum permissable speed at the current location.</param>
+        public simulatedTrain(double kmPoint, double singleLineKm, GeoLocation location, double elevation, string TraximNode, string TraximSection, 
+                            double time, double velocity,double previousDistance,double maxSpeed)
+        {
+            this.kmPoint = kmPoint;
+            this.singleLineKm = singleLineKm;
+            this.location = location;
+            this.elevation = elevation;
+            this.TraximNode = TraximNode;
+            this.TraximSection = TraximSection;
+            this.time = time;
+            this.velocity = velocity;
+            this.previousDistance = previousDistance;
+            this.maxSpeed = maxSpeed;
+        }
+
+        /// <summary>
+        /// SimulatedTrain object constructor
+        /// </summary>
+        /// <param name="kmPoint">kilometreage of the simualted train.</param>
+        /// <param name="singleLineKm">Cummulative kilometreage of the simulated train.</param>/// <param name="latitude"></param>
+        /// <param name="latitude">The latitude of the current location.</param>
+        /// <param name="longitude">The longitude of the current location.</param>
+        /// <param name="elevation">Elevation of the simulated train.</param>
+        /// <param name="TraximNode">The Traxim node relevant to the current location</param>
+        /// <param name="TraximSection">The Traxim section relevant to the current location</param>
+        /// <param name="time">Cummulative time in seconds of the simulated train.</param>
+        /// <param name="velocity">The instantaneous velocity of the simualted train at the current location.</param>
+        /// <param name="previousDistance">The distance in metres traveled between the previous position and the current position.</param>
+        /// <param name="maxSpeed">The maximum permissable speed at the current location.</param>
+        public simulatedTrain(double kmPoint, double singleLineKm, double latitude, double longitude, double elevation, string TraximNode, string TraximSection,
+                            double time, double velocity, double previousDistance, double maxSpeed)
+        {            
+            this.kmPoint = kmPoint;
+            this.singleLineKm = singleLineKm;
+            this.location.latitude = latitude;
+            this.location.longitude = longitude;
+            this.elevation = elevation;
+            this.TraximNode = TraximNode;
+            this.TraximSection = TraximSection;
+            this.time = time;
+            this.velocity = velocity;
+            this.previousDistance = previousDistance;
+            this.maxSpeed = maxSpeed;
+        }
+    
+    
+    }
+
+    /// <summary>
+    /// A class describing a geographic location with latitude and longitude.
     /// </summary>
     public class GeoLocation
     {
@@ -274,6 +375,16 @@ namespace ICEData
         {
             this.latitude = trainDetails.latitude;
             this.longitude = trainDetails.longitude;
+        }
+
+        /// <summary>
+        /// Geolocation constructor
+        /// </summary>
+        /// <param name="simulation">Simulated data object containing latitude and longitude of the location.</param>
+        public GeoLocation(simulatedTrain simulation)
+        {
+            this.latitude = simulation.location.latitude;
+            this.longitude = simulation.location.longitude;
         }
 
 
@@ -314,12 +425,19 @@ namespace ICEData
             string filename = null;
             string geometryFile = null; 
             string trainList = null;
+            string increasingSimulationFile = null;
+            string decreasingSimulationFile = null;
 
             /* Select the data file and the trainList file. */
             filename = @"S:\Corporate Strategy\Infrastructure Strategies\Simulations\Train Performance Analysis\Macarthur to Botany\raw data - sample.csv"; 
             //tool.browseFile("Select the data file.");
             geometryFile = @"S:\Corporate Strategy\Infrastructure Strategies\Simulations\Train Performance Analysis\Macarthur to Botany\Macarthur to Botany Geometry.csv"; 
             //tool.browseFile("Select the geometry file.");
+            increasingSimulationFile = @"S:\Corporate Strategy\Infrastructure Strategies\Simulations\Traxim\2017\Projects\Macarthur to Botany\Botany to Macarthur - All - 3.33_ThuW1.csv";
+            //tool.browseFile("Seelect the Simulation file with increasing km.");
+            decreasingSimulationFile = @"S:\Corporate Strategy\Infrastructure Strategies\Simulations\Traxim\2017\Projects\Macarthur to Botany\Macarthur to Botany - All - 3.20_SatW1.csv";
+            //tool.browseFile("Seelect the Simulation file with decreasing km.");
+
 
             if (includeAListOfTrainsToExclude)
             {
@@ -334,6 +452,18 @@ namespace ICEData
             List<trackGeometry> trackGeometry = new List<trackGeometry>();
             trackGeometry = track.readGeometryfile(geometryFile);
 
+            /* Read in the simulation data and interpolate to the desired interval. */
+            /* Increasing direction. */
+            List<simulatedTrain> increasingSimulation = new List<simulatedTrain>();
+            increasingSimulation = readSimulationData(increasingSimulationFile);
+            List<InterpolatedTrain> simulationIncreasing = new List<InterpolatedTrain>();
+            simulationIncreasing = processing.interpolateSimulationData(increasingSimulation, trackGeometry, startKm, endKm, interval);
+            /* Decreasing direction. */
+            List<simulatedTrain> decreasingSimulation = new List<simulatedTrain>();
+            decreasingSimulation = readSimulationData(decreasingSimulationFile);
+            List<InterpolatedTrain> simulationDecreasing = new List<InterpolatedTrain>();
+            simulationDecreasing = processing.interpolateSimulationData(decreasingSimulation, trackGeometry, startKm, endKm, interval);
+            
             /* Read the data. */
             List<TrainDetails> TrainRecords = new List<TrainDetails>();
             TrainRecords = readICEData(filename, latitude, longitude, dateRange, excludeTrainList);
@@ -357,7 +487,7 @@ namespace ICEData
 
             /* Average the train data for each direction with regard for TSR's and loop locations. */
             List<double> averageSpeed = new List<double>();
-            averageSpeed = processing.powerToWeightAverageSpeed(interpolatedRecords,0,2,direction.increasing);
+            averageSpeed = processing.powerToWeightAverageSpeed(interpolatedRecords,simulationIncreasing, 0,2,direction.increasing);
 
             /* seprate averages for P/W ratio groups, commodity, Operator */
 
@@ -464,6 +594,70 @@ namespace ICEData
 
             /* Return the list of records. */
             return IceRecord;
+        }
+
+        /// <summary>
+        /// Read the Traxim simulation files for the simulated data.
+        /// </summary>
+        /// <param name="filename">The simulation filename.</param>
+        /// <returns>The list of data for the simualted train.</returns>
+        public static List<simulatedTrain> readSimulationData(string filename)
+        {
+            /* Read all the lines of the data file. */
+            string[] lines = System.IO.File.ReadAllLines(filename);
+            char[] delimeters = { ',', '\t' };
+
+            /* Seperate the fields. */
+            string[] fields = lines[0].Split(delimeters);
+
+            /* Initialise the fields of interest. */
+            double kmPoint = 0;
+            double singleLineKm = 0;
+            double lat = 0;
+            double lon = 0;
+            double elevation = 0;
+            string TraximNode = "none";
+            string TraximSection = "none";
+            double time = 0;
+            double velocity = 0;
+            double previousDistance = 0;
+            double maxSpeed = 0;
+
+            bool header = true;
+
+            /* List of all simulated train data. */
+            List<simulatedTrain> simulatedTrain = new List<simulatedTrain>();
+
+            foreach (string line in lines)
+            {
+                if (header)
+                    /* Ignore the header line. */
+                    header = false;
+                else
+                {
+                    /* Seperate each record into each field */
+                    fields = line.Split(delimeters);
+
+                    double.TryParse(fields[0], out kmPoint);
+                    double.TryParse(fields[1], out lat);
+                    double.TryParse(fields[2], out lon);
+                    double.TryParse(fields[3], out elevation);
+                    TraximNode = fields[4];
+                    TraximSection = fields[6];
+                    double.TryParse(fields[8], out time);
+                    double.TryParse(fields[9], out velocity);
+                    double.TryParse(fields[10], out previousDistance);
+                    double.TryParse(fields[11], out maxSpeed);
+                    double.TryParse(fields[14], out singleLineKm);
+
+                    simulatedTrain record = new simulatedTrain(kmPoint, singleLineKm, lat, lon, elevation, TraximNode, TraximSection, time, velocity, previousDistance, maxSpeed);
+                    simulatedTrain.Add(record);                    
+
+                }
+            }
+
+            /* Return the list of records. */
+            return simulatedTrain;
         }
 
         /// <summary>

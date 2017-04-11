@@ -43,8 +43,7 @@ namespace ICEData
             this.temporarySpeedRestriction = 0;
             this.isTSRHere = false;
         }
-
-
+        
         /// <summary>
         /// Track Geometry Constructor
         /// </summary>
@@ -66,7 +65,6 @@ namespace ICEData
             this.kilometreage = kilometreage;
             this.virtualKilometreage = virtualKilometreage;
             this.isLoopHere = loop;
-            /**********************************/
             this.temporarySpeedRestriction = 0;
             this.isTSRHere = false;
         }
@@ -266,7 +264,7 @@ namespace ICEData
             for (int trackIdx = 0; trackIdx < trackGeometry.Count(); trackIdx++)
             {
                 /* Set the current track geometry point. */
-                trackKm = trackGeometry[trackIdx].virtualKilometreage; // .kilometreage;
+                trackKm = trackGeometry[trackIdx].virtualKilometreage; 
                 /* Calcualte the distance between the current track point and the location supplied. */
                 distance = Math.Abs(trackKm - location);
 

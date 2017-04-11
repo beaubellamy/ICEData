@@ -120,8 +120,7 @@ namespace ICEData
             }
             return filename;
         }
-
-
+        
         /// <summary>
         /// A wrapper function to contain the try catch block for selecting a file using the browser.
         /// </summary>
@@ -142,8 +141,7 @@ namespace ICEData
             }
             return filename;
         }
-
-
+        
         /// <summary>
         /// A wrapper function to contain the try catch block for selecting a file using the browser.
         /// </summary>
@@ -167,9 +165,8 @@ namespace ICEData
         }
 
         
-
-
   
         
-    }
+    } // Class tools
 }
+
