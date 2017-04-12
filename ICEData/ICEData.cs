@@ -390,6 +390,24 @@ namespace ICEData
 
     }
 
+    /// <summary>
+    /// A class describing the parameters associated with a TSR.
+    /// </summary>
+    public class TSRObject
+    {
+        public bool isTSRHere;
+        public double TSRSpeed;
+
+        /// <summary>
+        /// Default TSRObject constructor.
+        /// </summary>
+        public TSRObject()
+        {
+            this.isTSRHere = false;
+            this.TSRSpeed = 0;
+        }
+
+    }
 
 
     class ICEData
@@ -612,6 +630,8 @@ namespace ICEData
         public static List<simulatedTrain> readSimulationData(string filename)
         {
             /* Read all the lines of the data file. */
+            tool.isFileOpen(filename);
+            
             string[] lines = System.IO.File.ReadAllLines(filename);
             char[] delimeters = { ',', '\t' };
 
@@ -681,6 +701,8 @@ namespace ICEData
             List<string> excludeTrainList = new List<string>();
 
             /* Read all the lines of the file. */
+            tool.isFileOpen(filename);
+            
             string[] lines = System.IO.File.ReadAllLines(filename);
             char[] delimeters = { ',', '\'', '"', '\t', '\n' };     // not sure of the delimter ??
 

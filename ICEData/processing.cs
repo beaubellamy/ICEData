@@ -7,6 +7,7 @@ using GlobalSettings;
 
 namespace ICEData
 {
+    
     class processing
     {
         /* Mean radius of the Earth */
@@ -578,7 +579,6 @@ namespace ICEData
             return simulatedInterpolation;
         }
 
-
         /// <summary>
         /// Calculate the time interval between two locations based on the speed.
         /// </summary>
@@ -768,13 +768,13 @@ namespace ICEData
                     if (journey.trainDirection == direction)
                     {
                             
-                        /* Is there a TSR that applies */                        
-                        if (!isTrainInTSRBoundary())
+                        /* Is there a TSR that applies */
+                        if (!temporarySpeedRestrictionParameters(train, journey.geometryKm).isTSRHere)
                         {
                             /* Check train is not within the loop boundaries */
-                            if (!isTrainInLoopBoundary(train, Settings.loopBoundaryThreshold, journey.geometryKm))
+                            if (!isTrainInLoopBoundary(train, journey.geometryKm))
                             {
-                                if (journey.powerToWeight > lowerBound && journey.powerToWeight < upperBound)
+                                if (journey.powerToWeight > lowerBound && journey.powerToWeight <= upperBound)
                                 {
                                     speed.Add(journey.speed);
                                     sum = sum + journey.speed;
@@ -792,7 +792,7 @@ namespace ICEData
                         }
                         else 
                         {
-                            /* A TSR applies to the current position on the train. */
+                            /* A TSR applies to the current position of the train. */
                         }
                     }                    
                 }
@@ -817,19 +817,48 @@ namespace ICEData
             return averageSpeed;
         }
 
-       /// <summary>
-       /// Determine if the train is approaching, leaving or within a loop.
-       /// </summary>
-       /// <param name="train">The train object containing the journey details.</param>
-       /// <param name="loopThreshold">The window either side of the loop to consider the train within the loop boundary.</param>
-       /// <param name="targetLocation">The specific location being considered.</param>
-       /// <returns>True, if the train is within the boundaries of teh loop window.</returns>
-        public bool isTrainInLoopBoundary(Train train, double loopThreshold, double targetLocation)
+        /// <summary>
+        /// Calculate the average power to weight ratio of all trains within a band for a given direction of travel.
+        /// </summary>
+        /// <param name="trains">List of trains in the data.</param>
+        /// <param name="lowerBound">The lower bound of the acceptable power to weight ratio.</param>
+        /// <param name="upperBound">The upper bound of the acceptable power to weight ratio.</param>
+        /// <param name="direction">The direction of the km of the train journey.</param>
+        /// <returns>The average power to weight ratio for the trains in the specified direction.</returns>
+        public double averagePowerToWeightRatio(List<Train> trains, double lowerBound, double upperBound, direction direction)
+        {
+
+            List<double> power2Weight = new List<double>();
+            double power = 0;
+
+            /* Clycle through each train. */
+            foreach (Train train in trains)
+            {
+                if (train.TrainJourney[0].trainDirection == direction)
+                {
+                    /* Extract the power to weight ratio for each train. */
+                    power = train.TrainJourney[0].powerToWeight;
+                    if (power > lowerBound && power <= upperBound)
+                        power2Weight.Add(power);
+                }
+            }
+
+            /* Return the average power to weight ratio. */
+            return power2Weight.Average();            
+        }
+
+        /// <summary>
+        /// Determine if the train is approaching, leaving or within a loop.
+        /// </summary>
+        /// <param name="train">The train object containing the journey details.</param>
+        /// <param name="targetLocation">The specific location being considered.</param>
+        /// <returns>True, if the train is within the boundaries of teh loop window.</returns>
+        public bool isTrainInLoopBoundary(Train train, double targetLocation)
         {
             
             /* Find the indecies of the boundaries of the loop. */
-            double lookBack = targetLocation - loopThreshold;
-            double lookForward = targetLocation + loopThreshold;
+            double lookBack = targetLocation - Settings.loopBoundaryThreshold;
+            double lookForward = targetLocation + Settings.loopBoundaryThreshold;
             int lookBackIdx = train.indexOfgeometryKm(train.TrainJourney, lookBack);
             int lookForwardIdx = train.indexOfgeometryKm(train.TrainJourney, lookForward);
 
@@ -854,11 +883,44 @@ namespace ICEData
             return false;
         }
 
-        /* Dummy TSR boundary function. */
-        public bool isTrainInTSRBoundary()
+        /// <summary>
+        /// Determine the properties of the TSR if one applies.
+        /// </summary>
+        /// <param name="train">The train object containing the journey details.</param>
+        /// <param name="targetLocation">The specific location being considered.</param>
+        /// <returns>TSR object containting the TSR flag and the associated speed. </returns>
+        public TSRObject temporarySpeedRestrictionParameters(Train train, double targetLocation)
         {
+            TSRObject TSR = new TSRObject();
 
-            return false;
+            /* Find the indecies of the boundaries of the loop. */
+            double lookBack = targetLocation - Settings.TSRwindowBounday;
+            double lookForward = targetLocation + Settings.TSRwindowBounday;
+            int lookBackIdx = train.indexOfgeometryKm(train.TrainJourney, lookBack);
+            int lookForwardIdx = train.indexOfgeometryKm(train.TrainJourney, lookForward);
+
+            /* Check the indecies are valid */
+            if (lookBack < Settings.startKm && lookBackIdx == -1)
+                lookBackIdx = 0;
+            if (lookForward > Settings.endKm && lookForwardIdx == -1)
+                lookForwardIdx = train.TrainJourney.Count() - 1;
+
+            /* Determine if a loop is within the loop window of the current position. */
+            if (lookBackIdx >= 0 && lookForwardIdx >= 0)
+            {
+                for (int journeyIdx = lookBackIdx; journeyIdx < lookForwardIdx; journeyIdx++)
+                {
+                    TrainDetails journey = train.TrainJourney[journeyIdx];
+
+                    if (journey.isTSRHere)
+                    {
+                        TSR.isTSRHere = true;
+                        TSR.TSRSpeed = journey.TSRspeed;                    
+                    }
+
+                }
+            }
+            return TSR;
         }
 
 

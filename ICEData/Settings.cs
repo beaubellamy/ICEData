@@ -24,10 +24,10 @@ namespace GlobalSettings
         /* Processing parameters */
         public static double loopSpeedThreshold;            /* Cuttoff for the simulation speed, when comparing the train to the simualted train. */
         public static double loopBoundaryThreshold;         /* Distance either side of the loop to be considered within the loop boundary (km). */
+        public static double TSRwindowBounday;              /* Distance either side of the TSR location to be considered within the TSR boundary (km). */
         public static double timeThreshold;                 /* Minimum time between data points to be considered a seperate train. */
         public static double distanceThreshold;             /* Minimum ditance between successive data points. */
-       
-
+        
 
     } // Class Settings
 
