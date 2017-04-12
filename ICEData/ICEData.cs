@@ -24,8 +24,7 @@ namespace ICEData
         public string LocoID;
         public double powerToWeight;    // *************************************
         public DateTime NotificationDateTime;
-        public double latitude;
-        public double longitude;
+        public GeoLocation location = new GeoLocation();
         public double speed;
         public double kmPost;
         public double geometryKm;
@@ -43,8 +42,8 @@ namespace ICEData
             this.LocoID = "none";
             this.powerToWeight = 1;
             this.NotificationDateTime = new DateTime(2000, 1, 1, 0, 0, 0);
-            this.latitude = -33.8519;   //Sydney Harbour Bridge
-            this.longitude = 151.2108;
+            this.location.latitude = -33.8519;   //Sydney Harbour Bridge
+            this.location.longitude = 151.2108;
             this.speed = 0;
             this.kmPost = 0;
             this.geometryKm = 0;
@@ -74,8 +73,8 @@ namespace ICEData
             this.LocoID = locoID;
             this.powerToWeight = 1; // ************************************
             this.NotificationDateTime = NotificationDateTime;
-            this.latitude = latitude;
-            this.longitude = longitude;
+            this.location.latitude = latitude;
+            this.location.longitude = longitude;
             this.speed = speed;
             this.kmPost = kmPost;
             this.geometryKm = geometryKm;
@@ -374,8 +373,8 @@ namespace ICEData
         /// <param name="trainDetails">The trainDetails object containing the latitude and longitude of the location.</param>
         public GeoLocation(TrainDetails trainDetails)
         {
-            this.latitude = trainDetails.latitude;
-            this.longitude = trainDetails.longitude;
+            this.latitude = trainDetails.location.latitude;
+            this.longitude = trainDetails.location.longitude;
         }
 
         /// <summary>
@@ -496,7 +495,7 @@ namespace ICEData
             List<double> averageSpeed = new List<double>();
             averageSpeed = processing.powerToWeightAverageSpeed(interpolatedRecords,simulationIncreasing, 0,2,direction.increasing);
 
-            /* seprate averages for P/W ratio groups, commodity, Operator */
+            /* seperate averages for P/W ratio groups, commodity, Operator */
 
             /* Unpack the records into a single trainDetails object list. */
             List<TrainDetails> unpackedData = new List<TrainDetails>();
@@ -543,6 +542,8 @@ namespace ICEData
         public static List<TrainDetails> readICEData(string filename, List<string> excludeTrainList)
         {
             /* Read all the lines of the data file. */
+            tool.isFileOpen(filename);
+            
             string[] lines = System.IO.File.ReadAllLines(filename);
             char[] delimeters = { ',', '\t' };
 
@@ -767,8 +768,8 @@ namespace ICEData
                         TrainID[j, 0] = trainRecords[checkIdx].TrainID;
                         LocoID[j, 0] = trainRecords[checkIdx].LocoID;
                         NotificationTime[j, 0] = trainRecords[checkIdx].NotificationDateTime;
-                        latitude[j, 0] = trainRecords[checkIdx].latitude;
-                        longitude[j, 0] = trainRecords[checkIdx].longitude;
+                        latitude[j, 0] = trainRecords[checkIdx].location.latitude;
+                        longitude[j, 0] = trainRecords[checkIdx].location.longitude;
                         speed[j, 0] = trainRecords[checkIdx].speed;
                         kmPost[j, 0] = trainRecords[checkIdx].kmPost;
                         geometryKm[j, 0] = trainRecords[checkIdx].geometryKm;
